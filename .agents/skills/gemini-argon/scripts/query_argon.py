@@ -100,7 +100,7 @@ def query_gemini_argon(prompt: str, project: str = "ai-agy-512808", location: st
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             body = json.loads(resp.read().decode("utf-8"))
             candidates = body.get("candidates", [])
             if candidates:

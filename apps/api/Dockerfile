@@ -3,15 +3,14 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies including devDependencies for build
-COPY package*.json ./
-COPY prisma ./prisma/
-RUN npm ci
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Generate Prisma Client & build TypeScript
+COPY package.json ./
+COPY prisma ./prisma/
 COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
-RUN npx prisma generate && npm run build
+
+RUN pnpm install && pnpm exec prisma generate && pnpm run build
 
 # Production Runtime Stage
 FROM node:20-alpine AS runner
@@ -19,12 +18,12 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install production dependencies only
-COPY package*.json ./
-COPY prisma ./prisma/
-RUN npm ci --omit=dev && npx prisma generate
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy compiled artifacts from builder
+COPY package.json ./
+COPY prisma ./prisma/
+RUN pnpm install --prod && pnpm exec prisma generate
+
 COPY --from=builder /app/dist ./dist
 
 USER node

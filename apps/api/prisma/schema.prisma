@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum BotStatus {
+  INDEXING
+  READY
+  FAILED
+}
+
+enum MessageRole {
+  human
+  ai
+}
+
 model User {
   id               String                @id @default(uuid()) @db.VarChar(255)
   email            String                @unique @db.VarChar(255)
@@ -23,6 +34,7 @@ model User {
   freeTier         FreeTier?
   bots             Bot[]
   kbs              Kb[]
+  chatSessions     ChatSession[]
 }
 
 model FreeTier {
@@ -115,20 +127,45 @@ model Kb {
 }
 
 model Bot {
-  id              String   @id @db.VarChar(255)
-  model           String   @db.VarChar(100)
+  id              String        @id @db.VarChar(255)
+  model           String        @db.VarChar(100)
   profile_image   String?
-  name            String   @db.VarChar(100)
+  name            String        @db.VarChar(100)
   userId          String
   temperature     Float?
   prompt_template String?
   description     String?
   theme           String?
-  private         Boolean  @default(true)
+  private         Boolean       @default(true)
+  status          BotStatus     @default(INDEXING)
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   kb              Kb?
+  chatSessions    ChatSession[]
 
-  createdAt       DateTime? @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime? @default(now()) @db.Timestamptz(6)
+  createdAt       DateTime?     @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime?     @default(now()) @db.Timestamptz(6)
+}
+
+model ChatSession {
+  id        String        @id @default(uuid()) @db.VarChar(255)
+  botId     String        @db.VarChar(255)
+  userId    String        @db.VarChar(255)
+  title     String?       @db.VarChar(255)
+  createdAt DateTime?     @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime?     @default(now()) @db.Timestamptz(6)
+
+  bot       Bot           @relation(fields: [botId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid()) @db.VarChar(255)
+  sessionId String      @db.VarChar(255)
+  role      MessageRole
+  content   String      @db.Text
+  createdAt DateTime?   @default(now()) @db.Timestamptz(6)
+
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

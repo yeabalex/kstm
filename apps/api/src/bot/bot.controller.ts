@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { BotService } from './bot.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CreateBotDto } from './dto/create-bot.dto';
@@ -30,6 +31,10 @@ export class BotController {
 
   @Post('create')
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    short: { limit: 2, ttl: 1000 },
+    long: { limit: 10, ttl: 60000 },
+  })
   @HttpCode(HttpStatus.CREATED)
   async createBot(@Body() createBotDto: CreateBotDto) {
     return this.botService.createBot(createBotDto);

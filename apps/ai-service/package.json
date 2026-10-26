@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload",
-    "start": "uvicorn src.main:app --host 0.0.0.0 --port 8000",
-    "build": "echo 'No build step required for FastAPI'",
+    "dev": "python3 src/worker.py",
+    "start": "python3 src/worker.py",
     "test": "pytest"
   }
 }
