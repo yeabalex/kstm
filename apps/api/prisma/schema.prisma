@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String                @id @default(uuid()) @db.VarChar(255)
+  email            String                @unique @db.VarChar(255)
+  firstname        String                @db.VarChar(255)
+  lastname         String                @db.VarChar(255)
+  password         String                @db.VarChar(255)
+  stripeCustomerId String?               @unique @db.VarChar(100)
+  createdAt        DateTime?             @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime?             @default(now()) @db.Timestamp(6)
+
+  subscriptions    UserSubscription[]
+  payments         SubscriptionPayment[]
+  urls             Url[]
+  freeTier         FreeTier?
+  bots             Bot[]
+  kbs              Kb[]
+}
+
+model FreeTier {
+  id             Int       @id @default(autoincrement())
+  userId         String    @unique
+  freeChatCredit Int       @default(15)
+  freeUrlCredit  Int?      @db.SmallInt
+  createdAt      DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime? @default(now()) @db.Timestamp(6)
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSubscription {
+  id                   Int              @id @default(autoincrement())
+  userId               String           @unique
+  planId               Int
+  stripeSubscriptionId String           @db.VarChar(100)
+  status               String           @db.VarChar(20)
+  startDate            DateTime         @db.Timestamptz(6)
+  endDate              DateTime?        @db.Timestamptz(6)
+  trialEndDate         DateTime?        @db.Timestamptz(6)
+  canceledAt           DateTime?        @db.Timestamptz(6)
+  autoRenew            Boolean?         @default(true)
+  createdAt            DateTime?        @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime?        @default(now()) @db.Timestamptz(6)
+
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                 SubscriptionPlan @relation(fields: [planId], references: [id])
+}
+
+model SubscriptionPlan {
+  id              Int                 @id @default(autoincrement())
+  name            String              @db.VarChar(100)
+  description     String?
+  price           Decimal             @db.Decimal(10, 2)
+  billingInterval String              @db.VarChar(20)
+  features        Json?
+  isActive        Boolean?            @default(true)
+  createdAt       DateTime?           @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime?           @default(now()) @db.Timestamptz(6)
+
+  subscriptions   UserSubscription[]
+}
+
+model SubscriptionPayment {
+  id                    Int       @id @default(autoincrement())
+  userId                String
+  stripeInvoiceId       String?   @db.VarChar(100)
+  stripePaymentIntentId String?   @db.VarChar(100)
+  amount                Decimal   @db.Decimal(10, 2)
+  currency              String?   @default("USD") @db.VarChar(3)
+  paymentDate           DateTime  @db.Timestamptz(6)
+  status                String    @db.VarChar(20)
+  paymentMethod         String?   @db.VarChar(50)
+  paymentProcessor      String?   @db.VarChar(50)
+  transactionId         String?   @db.VarChar(100)
+  receiptUrl            String?
+  createdAt             DateTime? @default(now()) @db.Timestamptz(6)
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Url {
+  id         Int       @id @default(autoincrement())
+  userId     String
+  url        String
+  createdAt  DateTime? @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime? @default(now()) @db.Timestamptz(6)
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Kb {
+  id        String   @id @db.VarChar(255)
+  userId    String
+  botId     String   @unique
+
+  csv       String[]
+  pdf       String[]
+  web_url   String[]
+  json      String[]
+  txt       String[]
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime? @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model Bot {
+  id              String   @id @db.VarChar(255)
+  model           String   @db.VarChar(100)
+  profile_image   String?
+  name            String   @db.VarChar(100)
+  userId          String
+  temperature     Float?
+  prompt_template String?
+  description     String?
+  theme           String?
+  private         Boolean  @default(true)
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kb              Kb?
+
+  createdAt       DateTime? @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime? @default(now()) @db.Timestamptz(6)
+}
