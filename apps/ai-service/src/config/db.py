@@ -1,6 +1,9 @@
 import os
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_neo4j import Neo4jVector
+try:
+    from langchain_neo4j import Neo4jVector
+except ImportError:
+    from langchain_community.vectorstores import Neo4jVector
 
 def get_embedding_model():
     return GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
