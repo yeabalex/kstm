@@ -10,7 +10,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "infra:up": "docker-compose up -d",
     "infra:down": "docker-compose down",
-    "infra:logs": "docker-compose logs -f"
+    "infra:logs": "docker-compose logs -f",
+    "db:generate": "pnpm --filter @kstm/api run db:generate",
+    "db:push": "pnpm --filter @kstm/api run db:push",
+    "db:migrate": "pnpm --filter @kstm/api run db:migrate"
   },
   "devDependencies": {
     "prettier": "^3.3.3",

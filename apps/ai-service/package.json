@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "python3 src/worker.py",
-    "start": "python3 src/worker.py",
-    "test": "pytest"
+    "dev": ".venv/bin/python src/worker.py",
+    "start": ".venv/bin/python src/worker.py",
+    "test": ".venv/bin/pytest"
   }
 }

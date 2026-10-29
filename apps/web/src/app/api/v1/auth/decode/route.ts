@@ -1,9 +1,9 @@
-import { cookies } from "next/headers"; // Server-side cookie access
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { decode } from "jsonwebtoken";
+import { decode } from "@/lib/utils";
 
 export async function GET() {
-  const cookieStore = cookies(); 
+  const cookieStore = cookies();
   const token = (await cookieStore).get("access_token")?.value;
 
   if (!token) {
@@ -17,9 +17,14 @@ export async function GET() {
 
   try {
     const data = decode(token);
-    console.log(data);
+    if (!data) {
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
     return NextResponse.json(data);
-  } catch (error) {
+  } catch {
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

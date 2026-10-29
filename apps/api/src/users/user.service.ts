@@ -45,8 +45,8 @@ export class UserService {
       this.prisma.freeTier.create({
         data: {
           userId: userId,
-          freeChatCredit: 15,
-          freeUrlCredit: 3,
+          freeChatCredit: 100,
+          freeUrlCredit: 10,
         },
       }),
     ]);

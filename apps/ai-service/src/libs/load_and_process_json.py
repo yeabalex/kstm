@@ -62,11 +62,14 @@ def read_json(file_path: str) -> str:
 
 def load_and_process_json(
     file_path: str,
-    chunk_size: int = 1000,
-    chunk_overlap: int = 200,
+    chunk_size: int = 4000,
+    chunk_overlap: int = 300,
     cache_dir: Path = Path(".cache/json"),
     refresh: bool = False,
 ) -> List[Document]:
+    if isinstance(chunk_size, bool):
+        refresh = chunk_size
+        chunk_size = 4000
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_key = create_cache_key(file_path)
     cache_path = cache_dir / f"{cache_key}.json"
@@ -75,8 +78,9 @@ def load_and_process_json(
         try:
             with open(cache_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                logger.info("Loaded JSON from cache: %s", file_path)
-                return [Document(page_content=d["page_content"], metadata=d["metadata"]) for d in data]
+                if data:
+                    logger.info("Loaded JSON from cache: %s", file_path)
+                    return [Document(page_content=d["page_content"], metadata=d["metadata"]) for d in data]
         except Exception as e:
             logger.warning("JSON Cache load failed: %s. Reloading.", e)
 
@@ -102,4 +106,4 @@ def load_and_process_json(
         return documents
     except Exception as e:
         logger.error("Error processing JSON %s: %s", file_path, e)
-        return []
+        raise

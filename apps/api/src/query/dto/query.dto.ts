@@ -1,9 +1,9 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class QueryDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'user_id is required' })
-  user_id: string;
+  user_id?: string;
 
   @IsString()
   @IsNotEmpty({ message: 'bot_id is required' })

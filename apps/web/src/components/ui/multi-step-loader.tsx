@@ -2,137 +2,134 @@
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "motion/react";
 import { useState, useEffect } from "react";
-
-const CheckIcon = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className={cn("w-6 h-6 ", className)}
-    >
-      <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-    </svg>
-  );
-};
-
-const CheckFilled = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className={cn("w-6 h-6 ", className)}
-    >
-      <path
-        fillRule="evenodd"
-        d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
-};
+import { Check, Loader2, ArrowUpRight } from "lucide-react";
 
 type LoadingState = {
   text: string;
 };
 
-const LoaderCore = ({
-    loadingStates,
-    value = 0,
-  }: {
-    loadingStates: LoadingState[];
-    value?: number;
-  }) => {
-    return (
-        <div className="flex relative justify-start max-w-xl mx-auto flex-col mt-40 pointer-events-none">
-          {loadingStates.map((loadingState, index) => {
-            const distance = Math.abs(index - value);
-            const opacity = Math.max(1 - distance * 0.2, 0);
-  
-            return (
-              <motion.div
-                key={index}
-                className="text-left flex gap-2 mb-4"
-                initial={{ opacity: 0, y: -(value * 40) }}
-                animate={{ opacity: opacity, y: -(value * 40) }}
-                transition={{ duration: 0.5 }}
-              >
-                <div>
-                  {index > value && (
-                    <CheckIcon className="text-black dark:text-white" />
-                  )}
-                  {index <= value && (
-                    <CheckFilled
-                      className={cn(
-                        "text-black dark:text-white",
-                        value === index &&
-                          "text-black dark:text-lime-500 opacity-100"
-                      )}
-                    />
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    "text-black dark:text-white",
-                    value === index && "text-black dark:text-lime-500 opacity-100"
-                  )}
-                >
-                  {loadingState.text}
-                </span>
-              </motion.div>
-            );
-          })}
-        </div>
-    );
-  };
-  
+export const MultiStepLoader = ({
+  loadingStates,
+  loading,
+  curr,
+  progress,
+  statusText,
+  onContinueInBackground,
+}: {
+  loadingStates: LoadingState[];
+  loading?: boolean;
+  curr: number;
+  loop?: boolean;
+  progress?: number;
+  statusText?: string;
+  onContinueInBackground?: () => void;
+}) => {
+  const [currentState, setCurrentState] = useState(0);
 
-  export const MultiStepLoader = ({
-    loadingStates,
-    loading,
-    curr,
-    loop = false,
-  }: {
-    loadingStates: LoadingState[];
-    loading?: boolean;
-    curr: number;
-    loop?: boolean;
-  }) => {
-    const [currentState, setCurrentState] = useState(-1);
-  
-    useEffect(() => {
-      if (!loading) {
-        setCurrentState(-1);
-        return;
-      }
-      setCurrentState(curr);
-    }, [curr, loading]);
-  
-    return (
-      <AnimatePresence mode="wait">
-        {loading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[1000] flex items-center justify-center bg-white pointer-events-auto" // covers full screen, semi-transparent bg
-          >
-            {/* Transparent overlay to block interaction */}
-            <div className="absolute inset-0 bg-transparent pointer-events-auto z-0" />
-  
-            {/* Loader content */}
-            <div className="relative z-10 pointer-events-none">
-              <LoaderCore value={currentState} loadingStates={loadingStates} />
+  useEffect(() => {
+    if (!loading) {
+      setCurrentState(0);
+      return;
+    }
+    setCurrentState(Math.max(0, curr));
+  }, [curr, loading]);
+
+  const computedProgress =
+    typeof progress === "number"
+      ? Math.min(100, Math.max(0, Math.round(progress)))
+      : Math.min(
+          95,
+          Math.round(((currentState + 0.5) / Math.max(loadingStates.length, 1)) * 100)
+        );
+
+  return (
+    <AnimatePresence mode="wait">
+      {loading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-zinc-950/30 backdrop-blur-xs p-4"
+        >
+          <div className="w-full max-w-md bg-white border border-zinc-200 rounded-xl shadow-lg p-6">
+            {/* Header + Percentage */}
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-950">
+                  Provisioning Assistant
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  {statusText || "Indexing knowledge sources in the background..."}
+                </p>
+              </div>
+              <span className="text-xs font-mono font-semibold text-zinc-900 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-md">
+                {computedProgress}%
+              </span>
             </div>
-  
-            {/* Optional visual background effect */}
-            <div className="bg-gradient-to-t inset-x-0 bottom-0 absolute h-full z-0 pointer-events-none [mask-image:radial-gradient(900px_at_center,transparent_30%,white)]" />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
-  };
-  
+
+            {/* Progress Bar */}
+            <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden mb-5">
+              <div
+                className="h-full bg-zinc-900 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${Math.max(4, computedProgress)}%` }}
+              />
+            </div>
+
+            {/* Step List */}
+            <div className="space-y-2.5">
+              {loadingStates.map((step, index) => {
+                const isCompleted = index < currentState || computedProgress === 100;
+                const isActive = index === currentState && computedProgress < 100;
+
+                return (
+                  <div
+                    key={index}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg border text-xs transition-colors",
+                      isActive
+                        ? "bg-zinc-50 border-zinc-200/90 text-zinc-950 font-medium"
+                        : isCompleted
+                        ? "bg-white border-transparent text-zinc-600"
+                        : "bg-white border-transparent text-zinc-400"
+                    )}
+                  >
+                    <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                      {isCompleted ? (
+                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                        </div>
+                      ) : isActive ? (
+                        <Loader2 className="w-3.5 h-3.5 text-zinc-900 animate-spin" />
+                      ) : (
+                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
+                      )}
+                    </div>
+                    <span className="truncate">{step.text}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Non-blocking Background Escape Hatch */}
+            {onContinueInBackground && (
+              <div className="mt-5 pt-4 border-t border-zinc-100 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-zinc-400">
+                  Runs asynchronously on worker queue
+                </span>
+                <button
+                  type="button"
+                  onClick={onContinueInBackground}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-zinc-950 transition-colors"
+                >
+                  <span>Continue in background</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+

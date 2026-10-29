@@ -1,9 +1,7 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import FileUploader from "./FileUploader";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { AUTH_BASE_URL, NEXT_JS_PROXY_URL } from "@/const";
-import { Button } from "../ui/button";
+import { AUTH_BASE_URL } from "@/const";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,16 +10,28 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {nanoid} from 'nanoid'
+import { nanoid } from "nanoid";
 import { useAuth } from "@/context/AuthContext";
 import { MultiStepLoader } from "../ui/multi-step-loader";
 import BotTrainingSuccess from "../sucesss/Success";
 import BotTrainingFailed from "../error/ErrorTraining";
-import { newPrivateChat } from "@/lib/utils";
-import ApiClient from "@/lib/ApiClient";
 import { useRouter } from "next/navigation";
+import {
+  FileText,
+  Database,
+  FileJson,
+  FileType,
+  Globe,
+  X,
+  Plus,
+  Upload,
+  ArrowRight,
+  Key,
+  Sliders,
+  Sparkles,
+  AlertCircle,
+} from "lucide-react";
 
-// Type definitions
 interface AIModel {
   provider: string;
   name: string;
@@ -58,19 +68,23 @@ interface FileSelection {
 }
 
 const loadingStates = [
-  {
-    text: "Uploading files",
-  },
-  {
-    text: "Scraping pages", // Changed from "Processing files"
-  },
-  {
-    text: "Creating Bot",
-  },
+  { text: "Uploading source files" },
+  { text: "Queueing BullMQ ingestion job" },
+  { text: "Extracting & chunking documents" },
+  { text: "Indexing embeddings into Neo4j vector store" },
 ];
 
+const fileTypeConfig: Record<
+  string,
+  { label: string; ext: string; icon: React.ElementType }
+> = {
+  pdf: { label: "PDF", ext: ".pdf", icon: FileText },
+  csv: { label: "CSV", ext: ".csv", icon: Database },
+  json: { label: "JSON", ext: ".json", icon: FileJson },
+  txt: { label: "TXT", ext: ".txt", icon: FileType },
+};
+
 const AITrainingPage = () => {
-  // Bot metadata state
   const [botMetadata, setBotMetadata] = useState<BotMetadata>({
     name: "",
     description: "",
@@ -79,30 +93,32 @@ const AITrainingPage = () => {
   const [currentState, setCurrentState] = useState(-1);
   const { userId } = useAuth();
   const [botId, setBotId] = useState<string | null>(null);
-  const [kbId, setKbId] = useState<string | null>(null)
+  const [kbId, setKbId] = useState<string | null>(null);
   const router = useRouter();
-  // Tag input state
   const [tagInput, setTagInput] = useState("");
 
-  // AI configuration state
   const [aiConfig, setAIConfig] = useState<AIConfig>({
     selectedProvider: "gemini",
-    selectedModel: "gemini-pro",
+    selectedModel: "gemini-2.5-flash",
     useCustomAPIKey: false,
     apiKey: "",
     temperature: 0.7,
   });
 
-  // Prompt template state
   const [promptTemplate, setPromptTemplate] = useState("");
-
-  // Training status
   const [trainingStatus, setTrainingStatus] = useState<
     null | "pending" | "success" | "error"
   >(null);
   const [trainingMessage, setTrainingMessage] = useState("");
+  const [progressPercent, setProgressPercent] = useState<number>(0);
+  const pollingCancelRef = useRef<boolean>(false);
 
-  // File upload state
+  useEffect(() => {
+    return () => {
+      pollingCancelRef.current = true;
+    };
+  }, []);
+
   const [uploadedFiles, setUploadedFiles] = useState<{
     csv: string[];
     pdf: string[];
@@ -118,56 +134,67 @@ const AITrainingPage = () => {
   });
 
   const [selectedFiles, setSelectedFiles] = useState<FileSelection>({
+    pdf: [],
     csv: [],
     json: [],
-    pdf: [],
     txt: [],
   });
   const [enteredUrls, setEnteredUrls] = useState<string[]>([]);
   const [urlInput, setUrlInput] = useState("");
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [totalFiles, setTotalFiles] = useState<number>(0);
-  // Available AI models
+
   const aiModels: AIModel[] = [
     {
       provider: "gemini",
-      name: "gemini-pro",
-      description: "Balanced model for general tasks",
+      name: "gemini-2.5-flash",
+      description: "Free tier — Fast & high accuracy",
       enabled: true,
     },
     {
       provider: "gemini",
-      name: "gemini-ultra",
-      description: "Advanced model for complex reasoning",
+      name: "gemini-2.5-flash-lite",
+      description: "Free tier — Lowest latency & highest quota",
+      enabled: true,
+    },
+    {
+      provider: "gemini",
+      name: "gemini-2.0-flash",
+      description: "Free tier — Balanced grounded synthesis",
+      enabled: true,
+    },
+    {
+      provider: "gemini",
+      name: "gemini-2.5-pro",
+      description: "Free tier — Deep multi-document reasoning",
+      enabled: true,
+    },
+    {
+      provider: "gemini",
+      name: "gemma-3-27b-it",
+      description: "Free tier — Open-weights Gemma 3 (27B)",
       enabled: true,
     },
     {
       provider: "openai",
-      name: "gpt-4",
+      name: "gpt-4o",
       description: "Advanced reasoning and instructions",
       enabled: false,
     },
     {
       provider: "claude",
-      name: "claude-3-opus",
+      name: "claude-3-7-sonnet",
       description: "Highest capability Claude model",
       enabled: false,
     },
     {
-      provider: "grok",
-      name: "grok-1",
-      description: "General purpose AI assistant",
-      enabled: false,
-    },
-    {
       provider: "deepseek",
-      name: "deepseek-coder",
-      description: "Specialized for coding tasks",
+      name: "deepseek-r1",
+      description: "Specialized reasoning model",
       enabled: false,
     },
   ];
 
-  // Handle tag addition
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && tagInput.trim() !== "") {
       e.preventDefault();
@@ -181,7 +208,6 @@ const AITrainingPage = () => {
     }
   };
 
-  // Handle tag removal
   const handleRemoveTag = (tagToRemove: string) => {
     setBotMetadata({
       ...botMetadata,
@@ -189,7 +215,6 @@ const AITrainingPage = () => {
     });
   };
 
-  // Handle form input changes
   const handleMetadataChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -200,7 +225,6 @@ const AITrainingPage = () => {
     });
   };
 
-  // Handle AI config changes
   const handleAIConfigChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -208,7 +232,7 @@ const AITrainingPage = () => {
     const newValue =
       type === "checkbox"
         ? (e.target as HTMLInputElement).checked
-        : type === "number"
+        : type === "number" || type === "range"
         ? parseFloat(value)
         : value;
 
@@ -233,6 +257,11 @@ const AITrainingPage = () => {
     const files = event.target.files;
     if (files) {
       const newFiles = Array.from(files);
+      if (totalFiles + newFiles.length > 3) {
+        setUploadStatus("You can attach up to 3 knowledge sources per assistant.");
+        return;
+      }
+      setUploadStatus(null);
       setSelectedFiles((prev) => ({
         ...prev,
         [type]: [...(prev[type] || []), ...newFiles],
@@ -256,11 +285,11 @@ const AITrainingPage = () => {
       urlInput.trim()
     );
     if (!isValidUrl) {
-      setUploadStatus("Please enter a valid URL.");
+      setUploadStatus("Enter a valid URL starting with http:// or https://");
       return;
     }
     if (totalFiles >= 3) {
-      setUploadStatus("You can upload a maximum of 3 items in total.");
+      setUploadStatus("You can attach up to 3 knowledge sources in total.");
       return;
     }
     setEnteredUrls((prev) => [...prev, urlInput.trim()]);
@@ -275,12 +304,16 @@ const AITrainingPage = () => {
       return updated;
     });
   };
-  
-  // Handle file upload response
-  const handleUploadResponse = (response: UploadResponse) => {
-    const newUploadedFiles = { ...uploadedFiles };
 
-    // Process uploaded files
+  const handleUploadResponse = (response: UploadResponse) => {
+    const newUploadedFiles = {
+      csv: [] as string[],
+      pdf: [] as string[],
+      txt: [] as string[],
+      json: [] as string[],
+      web_url: [] as string[],
+    };
+
     response.files.forEach((file) => {
       switch (file.fileType) {
         case "csv":
@@ -298,7 +331,6 @@ const AITrainingPage = () => {
       }
     });
 
-    // Process URLs if any
     if (response.urls) {
       newUploadedFiles.web_url = [
         ...newUploadedFiles.web_url,
@@ -310,48 +342,114 @@ const AITrainingPage = () => {
     return newUploadedFiles;
   };
 
-  // Helper function to check if there are any selected files
   const hasSelectedFiles = () => {
-    return Object.values(selectedFiles).some(files => files.length > 0);
+    return Object.values(selectedFiles).some((files) => files.length > 0);
   };
 
-  // Start training
+  const pollIngestionStatus = async (targetBotId: string) => {
+    const maxAttempts = 120; // up to ~2.5 minutes at 1.2s interval
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (pollingCancelRef.current) {
+        return;
+      }
+
+      try {
+        const { data } = await axios.get(
+          `${AUTH_BASE_URL}/api/v1/bot/${targetBotId}/status`,
+          { withCredentials: true }
+        );
+
+        const workerProgress =
+          typeof data.progress === "number" ? data.progress : 0;
+        // Scale overall progress from 20% (queued) to 100% (indexed)
+        const scaledProgress = Math.min(
+          100,
+          Math.max(20, Math.round(20 + workerProgress * 0.8))
+        );
+        setProgressPercent(scaledProgress);
+
+        if (data.status === "READY" || data.job_state === "completed") {
+          setProgressPercent(100);
+          setCurrentState(3);
+          setTrainingStatus("success");
+          setTrainingMessage(`Assistant "${botMetadata.name}" deployed.`);
+          return;
+        }
+
+        if (data.status === "FAILED" || data.job_state === "failed") {
+          throw new Error(
+            data.error ||
+              "Document ingestion failed in worker. Check source URLs or files."
+          );
+        }
+
+        if (workerProgress >= 80) {
+          setCurrentState(3);
+          setTrainingMessage(
+            "Embedding chunks & indexing into Neo4j vector store..."
+          );
+        } else if (workerProgress >= 5 || data.job_state === "active") {
+          setCurrentState(2);
+          setTrainingMessage("Extracting & chunking knowledge sources...");
+        } else {
+          setCurrentState(1);
+          setTrainingMessage("Waiting for BullMQ ingestion worker...");
+        }
+      } catch (pollErr: any) {
+        // Re-throw if it's an explicit worker failure
+        if (
+          pollErr.message &&
+          !axios.isAxiosError(pollErr)
+        ) {
+          throw pollErr;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
+
+    // If still indexing after maxAttempts, let user proceed while indexing finishes
+    setTrainingStatus("success");
+  };
+
   const handleStartTraining = async () => {
-    // Validate required fields
     if (!botMetadata.name.trim()) {
       setTrainingStatus("error");
-      setTrainingMessage("Bot name is required");
+      setTrainingMessage("Assistant name is required.");
       return;
     }
 
     if (aiConfig.useCustomAPIKey && !aiConfig.apiKey.trim()) {
       setTrainingStatus("error");
-      setTrainingMessage("API key is required when using custom keys");
+      setTrainingMessage("API key is required when custom key mode is enabled.");
       return;
     }
 
-    // Set training status to pending
+    pollingCancelRef.current = false;
     setTrainingStatus("pending");
-    
-    const bot_id = nanoid();
-    const kb_id = nanoid()
-    const generatedBotId = `${bot_id}`;
-    const generatedKbId = `${kb_id}`;
+    setProgressPercent(5);
+    setCurrentState(0);
+
+    const generatedBotId = `${nanoid()}`;
+    const generatedKbId = `${nanoid()}`;
     setBotId(generatedBotId);
     setKbId(generatedKbId);
 
     try {
-      let processedFiles = { ...uploadedFiles };
+      let processedFiles = {
+        csv: [] as string[],
+        pdf: [] as string[],
+        txt: [] as string[],
+        json: [] as string[],
+        web_url: [] as string[],
+      };
 
-      // Check if we have files to upload
       if (hasSelectedFiles()) {
-        // Step 1: Upload files
-        setTrainingMessage("Uploading files...");
+        setTrainingMessage("Uploading source files...");
         setCurrentState(0);
+        setProgressPercent(10);
 
         const formData = new FormData();
-
-        // Add files to formData
         for (const [type, files] of Object.entries(selectedFiles)) {
           files.forEach((file) => formData.append(type, file));
         }
@@ -371,30 +469,22 @@ const AITrainingPage = () => {
             },
           }
         );
-      
+
         if (!uploadResponse.data.success) {
           throw new Error("File upload failed");
         }
 
-        // Process the uploaded files
         processedFiles = handleUploadResponse(uploadResponse.data);
       }
 
-      // Step 2: Scraping pages (if URLs exist) or processing files
       if (enteredUrls.length > 0) {
-        setTrainingMessage("Scraping pages...");
-        setCurrentState(1);
-        // Add URLs to processedFiles
         processedFiles.web_url = [...processedFiles.web_url, ...enteredUrls];
-      } else if (hasSelectedFiles()) {
-        setTrainingMessage("Processing files...");
-        setCurrentState(1);
       }
 
-      // Step 3: Create bot
-      setTrainingMessage("Creating bot...");
-      setCurrentState(2);
-      
+      setTrainingMessage("Queueing BullMQ ingestion job...");
+      setCurrentState(1);
+      setProgressPercent(20);
+
       const botCreationData = {
         user_id: userId,
         bot_id: generatedBotId,
@@ -403,625 +493,610 @@ const AITrainingPage = () => {
         pdf: processedFiles.pdf.length > 0 ? processedFiles.pdf : undefined,
         txt: processedFiles.txt.length > 0 ? processedFiles.txt : undefined,
         json: processedFiles.json.length > 0 ? processedFiles.json : undefined,
-        web_url: processedFiles.web_url.length > 0 ? processedFiles.web_url : undefined,
+        web_url:
+          processedFiles.web_url.length > 0
+            ? processedFiles.web_url
+            : undefined,
         prompt_template: promptTemplate || undefined,
         temperature: aiConfig.temperature,
         bot_name: botMetadata.name,
         model: aiConfig.selectedModel,
-        // Additional data that could be included
         description: botMetadata.description || undefined,
         tags: botMetadata.tags.length > 0 ? botMetadata.tags : undefined,
         api_key: aiConfig.useCustomAPIKey ? aiConfig.apiKey : undefined,
       };
 
-      await axios.post(
-        `/api/v1/bot/create`,
-        botCreationData,
-        { withCredentials: true }
-      );
+      await axios.post(`/api/v1/bot/create`, botCreationData, {
+        withCredentials: true,
+      });
 
-      // Handle successful creation
-      setTrainingStatus("success");
-      setTrainingMessage(`Bot "${botMetadata.name}" successfully trained!`);
-
-      // You could navigate to a bot details page or dashboard here
-      // window.location.href = `/bots/${createBotResponse.data.bot_id}`;
+      // Poll BullMQ worker progress non-blockingly until READY or FAILED
+      await pollIngestionStatus(generatedBotId);
     } catch (error: any) {
       console.error("Training error:", error);
       setTrainingStatus("error");
       setTrainingMessage(
-        `Training failed: ${error.response?.data?.error || error.message}`
+        `Provisioning failed: ${error.response?.data?.error || error.message}`
       );
     } finally {
       setCurrentState(-1);
     }
   };
+
+  const handleContinueInBackground = () => {
+    pollingCancelRef.current = true;
+    router.push("/dashboard");
+  };
+
   async function handleGoToChat() {
-    router.push(`/chat/${botId}/${kbId}`)
+    router.push(`/chat/${botId}/${kbId}`);
   }
 
-  if (trainingStatus === "pending"){
-    return <MultiStepLoader loadingStates={loadingStates} loading={trainingStatus === "pending"} curr={currentState} />
+  const handleReset = () => {
+    setTrainingStatus(null);
+    setTrainingMessage("");
+    setProgressPercent(0);
+    setBotMetadata({ name: "", description: "", tags: [] });
+    setSelectedFiles({ pdf: [], csv: [], json: [], txt: [] });
+    setEnteredUrls([]);
+    setPromptTemplate("");
+  };
+
+  if (trainingStatus === "pending") {
+    return (
+      <MultiStepLoader
+        loadingStates={loadingStates}
+        loading={trainingStatus === "pending"}
+        curr={currentState}
+        progress={progressPercent}
+        statusText={trainingMessage}
+        onContinueInBackground={handleContinueInBackground}
+      />
+    );
   }
 
   if (trainingStatus === "success") {
-    return <BotTrainingSuccess botId={botId} botName={botMetadata.name} kbId={kbId} onGoToChat={handleGoToChat} />
+    return (
+      <BotTrainingSuccess
+        botId={botId}
+        botName={botMetadata.name}
+        kbId={kbId}
+        onGoToChat={handleGoToChat}
+        onReset={handleReset}
+      />
+    );
   }
 
   if (trainingStatus === "error") {
-    return <BotTrainingFailed errorMessage={trainingMessage} botName={botMetadata.name} />;
+    return (
+      <BotTrainingFailed
+        errorMessage={trainingMessage}
+        botName={botMetadata.name || "Untitled Assistant"}
+        onRetry={handleStartTraining}
+        onBack={() => setTrainingStatus(null)}
+      />
+    );
   }
+
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      <div className="flex justify-between items-center mb-8">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Create</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
-
-      <div className="grid grid-cols-1 gap-8">
-        {/* Section 1: Bot Metadata */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Bot Information</h2>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Bot Name *
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={botMetadata.name}
-              onChange={handleMetadataChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter bot name"
-              required
-            />
+    <div className="min-h-full bg-zinc-50 p-6 md:p-8">
+      <div className="max-w-5xl mx-auto">
+        {/* Top Breadcrumb & Header */}
+        <div className="mb-8 pb-6 border-b border-zinc-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <Breadcrumb className="mb-2">
+              <BreadcrumbList className="text-xs text-zinc-500">
+                <BreadcrumbItem>
+                  <BreadcrumbLink
+                    href="/dashboard"
+                    className="hover:text-zinc-900 transition-colors"
+                  >
+                    Assistants
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-zinc-900 font-medium">
+                    New Assistant
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <h1 className="text-xl font-semibold text-zinc-950 tracking-tight">
+              Configure Knowledge-Grounded Assistant
+            </h1>
+            <p className="text-xs text-zinc-500 mt-1">
+              Define identity, select model parameters, attach up to 3 knowledge base sources, and customize the system prompt.
+            </p>
           </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              name="description"
-              value={botMetadata.description}
-              onChange={handleMetadataChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Describe what your bot does"
-              rows={3}
-            />
-          </div>
-
-          <div className="mb-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tags
-            </label>
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleAddTag}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Add tags and press Enter"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2 mt-2">
-            {botMetadata.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center"
-              >
-                {tag}
-                <button
-                  onClick={() => handleRemoveTag(tag)}
-                  className="ml-1 text-blue-600 hover:text-blue-800 focus:outline-none"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
+          <button
+            onClick={handleStartTraining}
+            disabled={!botMetadata.name.trim()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors self-start sm:self-auto shrink-0"
+          >
+            <span>Deploy Assistant</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        {/* Section 2: AI Configuration */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">AI Configuration</h2>
+        {/* Main Two-Column Studio Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left 2 Columns: Identity, Knowledge Sources, Prompt Template */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Section 1: Identity */}
+            <section className="bg-white border border-zinc-200/90 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-sm font-semibold text-zinc-950">
+                    1. Identity & Metadata
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Displayed in the workspace and on the public chat interface.
+                  </p>
+                </div>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  REQUIRED
+                </span>
+              </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              AI Provider
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {["gemini", "openai", "claude", "grok", "deepseek"].map(
-                (provider) => (
-                  <div
-                    key={provider}
-                    className={`
-                    border rounded-md p-3 cursor-pointer transition-all
-                    ${
-                      provider === "gemini"
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-300 opacity-50"
-                    }
-                  `}
-                    onClick={() =>
-                      provider === "gemini" &&
-                      setAIConfig({ ...aiConfig, selectedProvider: provider })
-                    }
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium capitalize">{provider}</span>
-                      {provider !== "gemini" && (
-                        <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">
-                          Disabled
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                    Assistant Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={botMetadata.name}
+                    onChange={handleMetadataChange}
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-colors"
+                    placeholder="e.g. Stripe Billing Docs Assistant"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    name="description"
+                    value={botMetadata.description}
+                    onChange={handleMetadataChange}
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-colors resize-none"
+                    placeholder="Briefly describe what documents or domain this assistant covers..."
+                    rows={2}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                    Tags
+                  </label>
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleAddTag}
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-colors"
+                    placeholder="Type a tag and press Enter (e.g. internal, api, v2)"
+                  />
+                  {botMetadata.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {botMetadata.tags.map((tag, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 border border-zinc-200 text-zinc-700 rounded-md text-xs font-mono"
+                        >
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(tag)}
+                            className="text-zinc-400 hover:text-zinc-900"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </span>
-                      )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Section 2: Knowledge Sources */}
+            <section className="bg-white border border-zinc-200/90 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-sm font-semibold text-zinc-950">
+                    2. Knowledge Base Sources
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Attach PDF, CSV, JSON, or TXT files, or add live web URLs to index into Neo4j.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-zinc-600 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded">
+                    {totalFiles} / 3 sources
+                  </span>
+                </div>
+              </div>
+
+              {/* File Upload Picker */}
+              <div className="border border-dashed border-zinc-300 rounded-xl p-5 bg-zinc-50/60 mb-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-white border border-zinc-200 flex items-center justify-center text-zinc-600 shrink-0">
+                      <Upload className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-zinc-900">
+                        Select document files by format
+                      </p>
+                      <p className="text-[11px] text-zinc-500">
+                        Supported: .pdf, .csv, .json, .txt (up to 3 total sources)
+                      </p>
                     </div>
                   </div>
-                )
-              )}
-            </div>
-          </div>
+                </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Model
-            </label>
-            <select
-              name="selectedModel"
-              value={aiConfig.selectedModel}
-              onChange={handleAIConfigChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {aiModels
-                .filter(
-                  (model) =>
-                    model.provider === aiConfig.selectedProvider &&
-                    model.enabled
-                )
-                .map((model) => (
-                  <option key={model.name} value={model.name}>
-                    {model.name} - {model.description}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div className="mb-4">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="useCustomAPIKey"
-                name="useCustomAPIKey"
-                checked={aiConfig.useCustomAPIKey}
-                onChange={handleAIConfigChange}
-                className="mr-2 h-4 w-4"
-              />
-              <label
-                htmlFor="useCustomAPIKey"
-                className="text-sm font-medium text-gray-700"
-              >
-                Use custom API key
-              </label>
-            </div>
-          </div>
-
-          {aiConfig.useCustomAPIKey && (
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                API Key
-              </label>
-              <input
-                type="password"
-                name="apiKey"
-                value={aiConfig.apiKey}
-                onChange={handleAIConfigChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter your API key"
-              />
-            </div>
-          )}
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Temperature: {aiConfig.temperature}
-            </label>
-            <input
-              type="range"
-              name="temperature"
-              min="0"
-              max="1"
-              step="0.1"
-              value={aiConfig.temperature}
-              onChange={handleAIConfigChange}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>Precise (0.0)</span>
-              <span>Balanced (0.5)</span>
-              <span>Creative (1.0)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 3: File Upload */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Training Data</h2>
-          <div className="bg-white rounded-lg max-w-5xl">
-            <p className="text-gray-500 mb-6">
-              Upload a file (PDF, DOCX, TXT, CSV, Excel, PowerPoint) to generate
-              exam questions
-            </p>
-
-            <div className="mb-8">
-              <h3 className="text-lg font-medium mb-3 flex items-center text-gray-700">
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  ></path>
-                </svg>
-                Document Upload
-              </h3>
-
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50 flex flex-col items-center justify-center text-center">
-                <svg
-                  className="w-12 h-12 text-gray-400 mb-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  ></path>
-                </svg>
-                <p className="text-gray-600 mb-2 font-medium">Drag files</p>
-                <p className="text-gray-500 text-sm mb-4">
-                  Click to upload files (PDF, DOCX, TXT, CSV, Excel, PowerPoint)
-                </p>
-
-                <div className="flex space-x-3">
-                  {Object.keys(selectedFiles).map((type) => (
-                    <div key={type} className="flex-1">
-                      <label className="px-4 py-2 bg-white border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors text-sm shadow-sm flex items-center justify-center">
-                        <svg
-                          className="h-4 w-4 mr-1 text-gray-500"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"
-                          />
-                        </svg>
-                        {type.toUpperCase()}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {Object.keys(selectedFiles).map((type) => {
+                    const cfg = fileTypeConfig[type] || {
+                      label: type.toUpperCase(),
+                      ext: `.${type}`,
+                      icon: FileText,
+                    };
+                    const Icon = cfg.icon;
+                    return (
+                      <label
+                        key={type}
+                        className={`px-3 py-2.5 bg-white border border-zinc-200 rounded-lg cursor-pointer hover:border-zinc-400 transition-colors flex items-center justify-between text-xs font-medium text-zinc-800 ${
+                          totalFiles >= 3 ? "opacity-50 pointer-events-none" : ""
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Icon className="w-3.5 h-3.5 text-zinc-500" />
+                          {cfg.label}
+                        </span>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          {cfg.ext}
+                        </span>
                         <input
                           type="file"
                           name={type}
                           accept={`.${type}`}
                           multiple
+                          disabled={totalFiles >= 3}
                           onChange={(e) => handleFileChange(e, type)}
                           className="hidden"
                         />
                       </label>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
-            </div>
 
-            {/* Uploaded Files */}
-            {Object.values(selectedFiles).some((files) => files.length > 0) && (
-              <div className="mb-8">
-                <h3 className="text-lg font-medium mb-3 flex items-center text-gray-700">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
+              {/* Web URL Input */}
+              <div className="mb-5">
+                <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                  Add Web Page URL
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Globe className="w-4 h-4 text-zinc-400" />
+                    </div>
+                    <input
+                      type="url"
+                      className="w-full pl-9 pr-3.5 py-2 text-sm bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-colors"
+                      placeholder="https://docs.example.com/guide"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddUrl();
+                        }
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddUrl}
+                    disabled={totalFiles >= 3 || !urlInput.trim()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors shrink-0"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    ></path>
-                  </svg>
-                  Uploaded Files
-                </h3>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add URL</span>
+                  </button>
+                </div>
+              </div>
 
-                <div className="space-y-3">
+              {uploadStatus && (
+                <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{uploadStatus}</span>
+                </div>
+              )}
+
+              {/* Attached Sources List */}
+              {(hasSelectedFiles() || enteredUrls.length > 0) && (
+                <div className="space-y-2 pt-3 border-t border-zinc-100">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 mb-2">
+                    Queued Sources ({totalFiles})
+                  </div>
+
                   {Object.entries(selectedFiles).map(([type, files]) =>
                     files.map((file, index) => (
                       <div
                         key={`${type}-${index}`}
-                        className="flex items-center justify-between bg-blue-50 px-4 py-3 rounded-md border border-blue-100"
+                        className="flex items-center justify-between bg-zinc-50 px-3.5 py-2.5 rounded-lg border border-zinc-200/80"
                       >
-                        <div className="flex items-center">
-                          <div className="bg-blue-500 rounded-md p-2 mr-3">
-                            <svg
-                              className="h-5 w-5 text-white"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                              />
-                            </svg>
-                          </div>
-                          <div>
-                            <span className="text-gray-800 font-medium">
-                              {file.name}
-                            </span>
-                            <div className="flex items-center text-xs text-gray-500 mt-1">
-                              <span className="mr-2">
-                                {Math.round(file.size / 1024)} KB
-                              </span>
-                              <span className="flex items-center bg-green-100 text-green-800 px-2 py-0.5 rounded">
-                                <svg
-                                  className="w-3 h-3 mr-1"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M5 13l4 4L19 7"
-                                  ></path>
-                                </svg>
-                                Ready
-                              </span>
-                            </div>
-                          </div>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white border border-zinc-200 text-zinc-600 shrink-0">
+                            {type}
+                          </span>
+                          <span className="text-xs font-medium text-zinc-800 truncate">
+                            {file.name}
+                          </span>
+                          <span className="text-[11px] font-mono text-zinc-400 shrink-0">
+                            {Math.max(1, Math.round(file.size / 1024))} KB
+                          </span>
                         </div>
                         <button
                           type="button"
                           onClick={() => removeFile(type, index)}
-                          className="text-gray-500 hover:text-red-500 transition-colors p-1"
+                          className="text-zinc-400 hover:text-red-600 p-1 transition-colors"
                           aria-label="Remove file"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))
                   )}
-                </div>
-              </div>
-            )}
 
-            {/* URL Input Section */}
-            <div className="mb-8">
-              <h3 className="text-lg font-medium mb-3 flex items-center text-gray-700">
-                <svg
-                  className="w-5 h-5 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13.828 10.172a4 4 0 010 5.656m1.414-1.414a6 6 0 000-8.485l-3.535 3.535a2 2 0 010 2.828l3.535 3.536a6 6 0 000-8.485m-8.485 8.485a4 4 0 015.656 0"
-                  ></path>
-                </svg>
-                URL Input
-              </h3>
-
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition"
-                  placeholder="Enter a valid URL (e.g., https://example.com)"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                />
-                <Button
-                  onClick={handleAddUrl}
-                  disabled={totalFiles >= 3}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
-                >
-                  Add URL
-                </Button>
-              </div>
-
-              {enteredUrls.length > 0 && (
-                <div className="space-y-3">
                   {enteredUrls.map((url, index) => (
                     <div
-                      key={index}
-                      className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-md border border-gray-200"
+                      key={`url-${index}`}
+                      className="flex items-center justify-between bg-zinc-50 px-3.5 py-2.5 rounded-lg border border-zinc-200/80"
                     >
-                      <div className="flex items-center truncate w-4/5">
-                        <div className="bg-gray-200 rounded-md p-2 mr-3">
-                          <svg
-                            className="h-5 w-5 text-gray-600"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M13.828 10.172a4 4 0 010 5.656m1.414-1.414a6 6 0 000-8.485l-3.535 3.535a2 2 0 010 2.828l3.535 3.536a6 6 0 000-8.485m-8.485 8.485a4 4 0 015.656 0"
-                            />
-                          </svg>
-                        </div>
-                        <span className="truncate text-gray-700">{url}</span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-white border border-zinc-200 text-zinc-600 shrink-0">
+                          URL
+                        </span>
+                        <span className="text-xs font-mono text-zinc-700 truncate">
+                          {url}
+                        </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => removeUrl(index)}
-                        className="text-gray-500 hover:text-red-500 transition-colors p-1"
+                        className="text-zinc-400 hover:text-red-600 p-1 transition-colors"
                         aria-label="Remove URL"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
 
-            {/* File Counter */}
-            <div className="mb-6 bg-gray-50 p-4 rounded-md border border-gray-200">
-              <div className="flex items-center mb-2">
-                <span className="font-medium text-gray-700 mr-2">
-                  Items uploaded:
-                </span>
-                <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">
-                  {totalFiles}/3
+              {enteredUrls.map((url, index) => (
+                <input key={index} type="hidden" name="urls" value={url} />
+              ))}
+            </section>
+
+            {/* Section 3: System Prompt Template */}
+            <section className="bg-white border border-zinc-200/90 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-sm font-semibold text-zinc-950">
+                    3. System Prompt Template
+                  </h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Optional instructions injected alongside retrieved context chunks.
+                  </p>
+                </div>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  OPTIONAL
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div
-                  className="bg-blue-500 h-2.5 rounded-full"
-                  style={{ width: `${Math.min(100, (totalFiles / 3) * 100)}%` }}
-                ></div>
+
+              <textarea
+                value={promptTemplate}
+                onChange={(e) => setPromptTemplate(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs font-mono bg-zinc-50 border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-colors"
+                placeholder={`You are a technical assistant. Answer the user's {{question}} strictly using the provided {{context}}. If the answer is not in the context, state that clearly.`}
+                rows={6}
+              />
+              <div className="mt-2.5 flex items-center gap-2 text-[11px] text-zinc-500">
+                <span>Available interpolation variables:</span>
+                <code className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-200 rounded font-mono text-zinc-700">
+                  {"{{context}}"}
+                </code>
+                <code className="px-1.5 py-0.5 bg-zinc-100 border border-zinc-200 rounded font-mono text-zinc-700">
+                  {"{{question}}"}
+                </code>
               </div>
-            </div>
+            </section>
+          </div>
 
-            {/* Additional Options */}
+          {/* Right Column: Model & Inference Configuration */}
+          <div className="space-y-6">
+            <section className="bg-white border border-zinc-200/90 rounded-xl p-6 sticky top-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Sliders className="w-4 h-4 text-zinc-600" />
+                <h2 className="text-sm font-semibold text-zinc-950">
+                  Model & Inference
+                </h2>
+              </div>
 
-            {/* Status Messages */}
-            {uploadStatus && (
-              <div
-                className={`mt-4 p-4 rounded-md ${
-                  uploadStatus.includes("failed")
-                    ? "bg-red-50 text-red-800 border border-red-200"
-                    : "bg-green-50 text-green-800 border border-green-200"
-                }`}
-              >
-                <div className="flex items-center">
-                  {uploadStatus.includes("failed") ? (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              <div className="space-y-5">
+                {/* Provider */}
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-2">
+                    Provider
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["gemini", "openai", "claude", "deepseek"].map(
+                      (provider) => {
+                        const enabled = provider === "gemini";
+                        const selected = aiConfig.selectedProvider === provider;
+                        return (
+                          <button
+                            type="button"
+                            key={provider}
+                            disabled={!enabled}
+                            onClick={() =>
+                              enabled &&
+                              setAIConfig({
+                                ...aiConfig,
+                                selectedProvider: provider,
+                              })
+                            }
+                            className={`px-3 py-2 rounded-lg border text-left transition-colors flex items-center justify-between ${
+                              selected
+                                ? "border-zinc-900 bg-zinc-900 text-white"
+                                : enabled
+                                ? "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
+                                : "border-zinc-100 bg-zinc-50 text-zinc-400 cursor-not-allowed"
+                            }`}
+                          >
+                            <span className="text-xs font-medium capitalize">
+                              {provider}
+                            </span>
+                            {!enabled && (
+                              <span className="text-[9px] font-mono uppercase">
+                                Soon
+                              </span>
+                            )}
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+
+                {/* Model Select */}
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                    Model
+                  </label>
+                  <select
+                    name="selectedModel"
+                    value={aiConfig.selectedModel}
+                    onChange={handleAIConfigChange}
+                    className="w-full px-3 py-2 text-xs font-mono bg-white border border-zinc-200 rounded-lg text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900"
+                  >
+                    {aiModels
+                      .filter(
+                        (model) =>
+                          model.provider === aiConfig.selectedProvider &&
+                          model.enabled
+                      )
+                      .map((model) => (
+                        <option key={model.name} value={model.name}>
+                          {model.name} — {model.description}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* Temperature */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-medium text-zinc-700">
+                      Temperature
+                    </label>
+                    <span className="text-xs font-mono text-zinc-900 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded">
+                      {aiConfig.temperature.toFixed(1)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    name="temperature"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={aiConfig.temperature}
+                    onChange={handleAIConfigChange}
+                    className="w-full accent-zinc-900 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] font-mono text-zinc-400 mt-1">
+                    <span>0.0 Grounded</span>
+                    <span>0.5 Balanced</span>
+                    <span>1.0 Creative</span>
+                  </div>
+                </div>
+
+                {/* Custom API Key Toggle */}
+                <div className="pt-4 border-t border-zinc-100">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="flex items-center gap-2 text-xs font-medium text-zinc-700">
+                      <Key className="w-3.5 h-3.5 text-zinc-400" />
+                      Bring your own API key
+                    </span>
+                    <input
+                      type="checkbox"
+                      id="useCustomAPIKey"
+                      name="useCustomAPIKey"
+                      checked={aiConfig.useCustomAPIKey}
+                      onChange={handleAIConfigChange}
+                      className="h-4 w-4 rounded border-zinc-300 accent-zinc-900"
+                    />
+                  </label>
+
+                  {aiConfig.useCustomAPIKey && (
+                    <div className="mt-3">
+                      <input
+                        type="password"
+                        name="apiKey"
+                        value={aiConfig.apiKey}
+                        onChange={handleAIConfigChange}
+                        className="w-full px-3 py-2 text-xs font-mono bg-white border border-zinc-200 rounded-lg text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900"
+                        placeholder="AIzaSy..."
                       />
-                    </svg>
-                  ) : (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 mr-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
+                    </div>
                   )}
-                  {uploadStatus}
+                </div>
+
+                {/* Summary & Deploy Button */}
+                <div className="pt-4 border-t border-zinc-100 space-y-3">
+                  <div className="bg-zinc-50 border border-zinc-200/70 rounded-lg p-3 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Model</span>
+                      <span className="font-mono text-zinc-800">
+                        {aiConfig.selectedModel}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Sources queued</span>
+                      <span className="font-mono text-zinc-800">
+                        {totalFiles} / 3
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-500">Vector index</span>
+                      <span className="font-mono text-zinc-800">Neo4j</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleStartTraining}
+                    disabled={!botMetadata.name.trim()}
+                    className="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Deploy Assistant</span>
+                  </button>
                 </div>
               </div>
-            )}
-
-            {/* Add hidden inputs for URLs */}
-            {enteredUrls.map((url, index) => (
-              <input key={index} type="hidden" name="urls" value={url} />
-            ))}
+            </section>
           </div>
         </div>
-
-        {/* Section 4: Prompt Template */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Prompt Template</h2>
-          <textarea
-            value={promptTemplate}
-            onChange={(e) => setPromptTemplate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter your prompt template here. Use {{variables}} for dynamic content."
-            rows={8}
-          />
-          <div className="mt-2 text-sm text-gray-500">
-            {`You can use variables like {{context}}, {{question}}, etc. The bot will replace these with actual values during conversations.`}
-          </div>
-        </div>
-
-        {/* Training Button */}
-        <div className="flex justify-end">
-          <Button
-            onClick={handleStartTraining}
-            className="bg-black text-white px-4 py-2 rounded-md"
-          >
-            Start Training
-          </Button>
-        </div>
-
       </div>
     </div>
   );

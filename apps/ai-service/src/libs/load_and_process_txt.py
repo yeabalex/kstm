@@ -17,11 +17,14 @@ def read_txt_file(file_path: str) -> str:
 
 def load_and_process_txt(
     file_path: str,
-    chunk_size: int = 1000,
-    chunk_overlap: int = 200,
+    chunk_size: int = 4000,
+    chunk_overlap: int = 300,
     cache_dir: Path = Path(".cache/txt"),
     refresh: bool = False,
 ) -> List[Document]:
+    if isinstance(chunk_size, bool):
+        refresh = chunk_size
+        chunk_size = 4000
     path_obj = Path(file_path)
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_key = create_cache_key(str(path_obj))
@@ -31,8 +34,9 @@ def load_and_process_txt(
         try:
             with open(cache_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                logger.info("Loaded TXT from JSON cache: %s", file_path)
-                return [Document(page_content=d["page_content"], metadata=d["metadata"]) for d in data]
+                if data:
+                    logger.info("Loaded TXT from JSON cache: %s", file_path)
+                    return [Document(page_content=d["page_content"], metadata=d["metadata"]) for d in data]
         except Exception as e:
             logger.warning("TXT Cache load failed: %s. Reloading.", e)
 
@@ -58,4 +62,4 @@ def load_and_process_txt(
         return documents
     except Exception as e:
         logger.error("Error processing TXT %s: %s", file_path, e)
-        return []
+        raise

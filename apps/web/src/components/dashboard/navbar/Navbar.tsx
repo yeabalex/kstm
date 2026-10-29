@@ -1,43 +1,39 @@
 import React from "react";
-import Image from "next/image";
-import {
-  MagnifyingGlassIcon,
-  BellIcon,
-  SparklesIcon,
-  ChevronDownIcon,
-} from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { Plus } from "lucide-react";
 import { NavbarActions } from "./NavbarActions";
 import Link from "next/link";
 
 const Header: React.FC = () => {
   return (
-    <div className="flex items-center justify-center gap-32 max-w-7xl px-4 py-[10px] bg-white border-b border-gray-100">
-      <div className="flex">
-      </div>
-
+    <header className="h-14 w-full px-6 bg-white border-b border-zinc-200/80 flex items-center justify-between gap-4 shrink-0">
       {/* Search Input */}
-
-      <div className="relative flex-1 max-w-xl">
-        <div className="flex items-center px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-          <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 mr-2" />
+      <div className="relative flex-1 max-w-md pl-10 lg:pl-0">
+        <div className="flex items-center px-3 py-1.5 bg-zinc-50 border border-zinc-200/90 rounded-lg focus-within:border-zinc-400 focus-within:bg-white transition-colors">
+          <MagnifyingGlassIcon className="w-4 h-4 text-zinc-400 mr-2 shrink-0" />
           <input
             type="text"
-            placeholder="Search AIs"
-            className="w-full bg-transparent border-none focus:outline-none text-sm"
+            placeholder="Search assistants..."
+            className="w-full bg-transparent border-none focus:outline-none text-xs text-zinc-900 placeholder:text-zinc-400"
           />
+          <kbd className="hidden sm:inline-block text-[10px] font-mono text-zinc-400 border border-zinc-200 rounded px-1.5 py-0.5 bg-white">
+            /
+          </kbd>
         </div>
       </div>
 
       {/* Right side actions */}
-      <div className="flex items-center space-x-4 ml-4">
-        {/* Create New Bot Button */}
-        <Link href="/dashboard/create" className="flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
-          <SparklesIcon className="w-5 h-5 mr-2" />
-          <span className="text-sm font-medium">Create New Bot</span>
+      <div className="flex items-center gap-3">
+        <Link
+          href="/dashboard/create"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition-colors text-xs font-medium"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>New Assistant</span>
         </Link>
         <NavbarActions />
       </div>
-    </div>
+    </header>
   );
 };
 

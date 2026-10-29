@@ -9,6 +9,7 @@ export type Bots = {
     description: string | null;
     theme: Theme;
     private: boolean;
+    status?: 'INDEXING' | 'READY' | 'FAILED';
     createdAt: string; // ISO date string
     updatedAt: string; // ISO date string
     kb: KnowledgeBase;

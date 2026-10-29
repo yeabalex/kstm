@@ -1,39 +1,39 @@
-// File: pages/404.tsx
-import { NextPage } from 'next';
-import Head from 'next/head';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { NextPage } from "next";
+import Link from "next/link";
+import { ArrowLeft, Terminal } from "lucide-react";
 
 const NotFound: NextPage = () => {
-  const [dots, setDots] = useState('');
-
-  // Animation for the searching dots
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots(prev => prev.length >= 3 ? '' : prev + '.');
-    }, 500);
-    
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center text-center px-4">
-      <Head>
-        <title>404 - Bot Not Found</title>
-        <meta name="description" content="Bot Not Found - 404 Error Page" />
-      </Head>
-
-      <main className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-        <h1 className="text-6xl font-bold text-red-500 mb-4">404</h1>
-        <h2 className="text-3xl font-mono mb-6">Bot Not Found</h2>
-        
-        <div className="border-t border-b border-gray-200 py-6 my-6">
-          <p className="text-lg mb-4">The bot you are looking for does not exist or has been deactivated.</p>
+    <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center px-4">
+      <main className="bg-white border border-zinc-200 rounded-xl shadow-xs p-8 max-w-md w-full text-left">
+        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200 text-xs font-mono text-zinc-600 mb-6">
+          <Terminal className="w-3.5 h-3.5" />
+          <span>ERR_BOT_NOT_FOUND · 404</span>
         </div>
-        
+
+        <h1 className="text-xl font-semibold text-zinc-950 tracking-tight mb-2">
+          Assistant unavailable
+        </h1>
+        <p className="text-sm text-zinc-600 leading-relaxed mb-6">
+          The assistant you requested does not exist, has been set to private, or its knowledge base was removed.
+        </p>
+
+        <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to Workspace
+          </Link>
+          <Link
+            href="/"
+            className="text-xs font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+          >
+            Home
+          </Link>
+        </div>
       </main>
-
-
     </div>
   );
 };

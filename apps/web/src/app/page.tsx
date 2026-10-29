@@ -1,159 +1,324 @@
-'use client'
+'use client';
 
 import React from 'react';
-import { ArrowRight, Upload, Zap, Share2, AlertCircle } from 'lucide-react';
+import {
+  ArrowRight,
+  FileText,
+  Database,
+  Globe,
+  FileJson,
+  FileType,
+  Share2,
+  Cpu,
+  Layers,
+  Check,
+} from 'lucide-react';
 import Link from 'next/link';
 
-const DataMindLanding = () => {
+const KSTMLanding = () => {
+  const sources = [
+    { label: 'PDF Documents', ext: '.pdf', icon: FileText },
+    { label: 'Structured CSV', ext: '.csv', icon: Database },
+    { label: 'JSON Schemas', ext: '.json', icon: FileJson },
+    { label: 'Plain Text & Notes', ext: '.txt', icon: FileType },
+    { label: 'Live Web Pages', ext: 'https://', icon: Globe },
+  ];
+
+  const capabilities = [
+    {
+      step: '01',
+      title: 'Multi-format ingestion',
+      description:
+        'Upload up to three document sources or point the scraper at live documentation URLs. Files are chunked and queued asynchronously via BullMQ.',
+      meta: 'PDF · CSV · JSON · TXT · URL',
+      icon: Layers,
+    },
+    {
+      step: '02',
+      title: 'Graph & vector indexing',
+      description:
+        'Chunks are embedded and indexed into Neo4j vector storage scoped to an isolated knowledge base ID so context never bleeds across assistants.',
+      meta: 'Neo4j Vector · Scoped KB',
+      icon: Cpu,
+    },
+    {
+      step: '03',
+      title: 'Configurable inference & sharing',
+      description:
+        'Tune model selection, temperature, custom system prompt templates with {{context}} variables, and toggle between private workspace or public link access.',
+      meta: 'Gemini · Access Control · Embed',
+      icon: Share2,
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="font-semibold text-xl text-gray-900">KSTM AI</div>
-          <Link href="/login" className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
-            Login
-          </Link>
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 flex flex-col">
+      {/* Top Navigation */}
+      <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-zinc-50/85 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex justify-between items-center">
+          <div className="flex items-center gap-8">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="w-6 h-6 rounded-md bg-zinc-900 text-white flex items-center justify-center font-mono text-xs font-semibold">
+                K
+              </div>
+              <span className="font-semibold text-sm tracking-tight text-zinc-950">
+                KSTM
+              </span>
+              <span className="text-[11px] font-mono text-zinc-400 border border-zinc-200 rounded px-1.5 py-0.5 bg-white">
+                v1.0
+              </span>
+            </Link>
+
+            <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-zinc-600">
+              <a href="#pipeline" className="hover:text-zinc-950 transition-colors">
+                Architecture
+              </a>
+              <a href="#demo" className="hover:text-zinc-950 transition-colors">
+                Walkthrough
+              </a>
+              <Link href="/usecases" className="hover:text-zinc-950 transition-colors">
+                Use Cases
+              </Link>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="text-xs font-medium text-zinc-600 hover:text-zinc-950 px-3 py-1.5 transition-colors"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              className="bg-zinc-900 text-white text-xs font-medium px-3.5 py-2 rounded-lg hover:bg-zinc-800 transition-colors inline-flex items-center gap-1.5"
+            >
+              Start building
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
-      </nav>
+      </header>
 
       {/* Hero Section */}
-      <section className="max-w-4xl mx-auto px-6 py-24 text-center">
-        <div className="inline-flex items-center space-x-2 bg-red-50 border border-red-100 rounded-full px-4 py-1.5 mb-8">
-          <AlertCircle className="w-4 h-4 text-red-600" />
-          <span className="text-sm font-medium text-red-600">Not actively maintained</span>
-        </div>
-        <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-          Build AI assistants
-          <br />
-          <span className="text-gray-500">with your data</span>
-        </h1>
+      <main className="flex-1">
+        <section className="max-w-6xl mx-auto px-6 pt-20 pb-16">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-white border border-zinc-200 text-xs font-mono text-zinc-600 mb-6 shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span>RETRIEVAL-GROUNDED ASSISTANTS</span>
+            </div>
 
-        <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
-          Upload CSV, PDF, JSON files or connect web sources.
-          Get a custom AI assistant in minutes. Share with anyone.
-        </p>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold text-zinc-950 tracking-tight leading-[1.08] mb-6">
+              Turn raw documents into scoped AI assistants.
+            </h1>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-          <Link href="#demo" className="bg-gray-900 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center group">
-            Watch our demo
-            <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-          </Link>
-          <Link href="/usecases" className="border border-gray-300 text-gray-700 px-8 py-3 rounded-lg hover:border-gray-400 transition-colors">
-            See example
-          </Link>
-        </div>
+            <p className="text-base sm:text-lg text-zinc-600 leading-relaxed mb-8 max-w-2xl">
+              Ingest PDFs, CSV tables, JSON files, plain text, or live web pages. KSTM indexes your sources into an isolated knowledge base and serves a shareable chat interface grounded strictly in your data.
+            </p>
 
-        {/* Data Sources */}
-        <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500">
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-            <span>CSV</span>
+            <div className="flex flex-wrap items-center gap-3 mb-12">
+              <Link
+                href="/register"
+                className="bg-zinc-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-zinc-800 transition-colors inline-flex items-center gap-2"
+              >
+                Create an assistant
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/dashboard"
+                className="bg-white border border-zinc-200 text-zinc-800 text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-zinc-100/80 hover:border-zinc-300 transition-colors"
+              >
+                Open Workspace
+              </Link>
+              <Link
+                href="/usecases"
+                className="text-sm font-medium text-zinc-500 hover:text-zinc-900 px-3 py-2.5 transition-colors"
+              >
+                Explore 24 templates →
+              </Link>
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span>PDF</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-            <span>JSON</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-            <span>Web pages</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-            <span>Text files</span>
-          </div>
-        </div>
-      </section>
 
-      {/* Video Demo */}
-      <section id="demo" className="max-w-5xl mx-auto px-6 pb-24">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            See it in action
-          </h2>
-          <p className="text-gray-600 text-lg">
-            Watch how easy it is to create your own AI assistant in minutes
-          </p>
-        </div>
-        <div className="relative w-full aspect-video rounded-xl shadow-2xl overflow-hidden bg-gray-900">
-          <iframe
-            className="absolute top-0 left-0 w-full h-full"
-            src="https://www.youtube.com/embed/t4ynNrGij6I?si=hCY3SNSL3pvo1AN1"
-            title="YouTube video player"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-          />
-        </div>
-      </section>
+          {/* Supported Source Formats Strip */}
+          <div className="border-t border-zinc-200/80 pt-8">
+            <div className="text-xs font-mono uppercase tracking-wider text-zinc-400 mb-4">
+              Supported Ingestion Formats
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {sources.map((src) => {
+                const Icon = src.icon;
+                return (
+                  <div
+                    key={src.ext}
+                    className="bg-white border border-zinc-200/90 rounded-lg px-3.5 py-3 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon className="w-4 h-4 text-zinc-500 shrink-0" />
+                      <span className="text-xs font-medium text-zinc-800 truncate">
+                        {src.label}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-zinc-400 bg-zinc-50 border border-zinc-200/70 px-1.5 py-0.5 rounded ml-2 shrink-0">
+                      {src.ext}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
-      {/* Features */}
-      <section className="border-t border-gray-100 py-20">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="grid md:grid-cols-3 gap-12">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-6">
-                <Upload className="w-6 h-6 text-gray-600" />
+        {/* Architecture / Pipeline Section */}
+        <section id="pipeline" className="border-y border-zinc-200/80 bg-white py-20">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+              <div>
+                <div className="text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
+                  Pipeline Architecture
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-semibold text-zinc-950 tracking-tight">
+                  From source files to deployed endpoint
+                </h2>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Upload your data</h3>
-              <p className="text-gray-600">
-                Drag and drop files or paste URLs. We support 20+ formats including CSV, PDF, JSON, and web pages.
+              <p className="text-sm text-zinc-500 max-w-md">
+                Every assistant runs against its own scoped knowledge base (`kb_id`) with configurable prompt variables and access rules.
               </p>
             </div>
 
-            <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-6">
-                <Zap className="w-6 h-6 text-gray-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">AI learns instantly</h3>
-              <p className="text-gray-600">
-                Our AI processes your data and creates a custom assistant that understands your specific context and domain.
-              </p>
-            </div>
+            <div className="grid md:grid-cols-3 gap-6">
+              {capabilities.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.step}
+                    className="border border-zinc-200 rounded-xl p-6 bg-zinc-50/40 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-5">
+                        <span className="font-mono text-xs text-zinc-400 border border-zinc-200 bg-white px-2 py-0.5 rounded">
+                          STEP {item.step}
+                        </span>
+                        <div className="w-8 h-8 rounded-lg bg-white border border-zinc-200 flex items-center justify-center text-zinc-700">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <h3 className="text-base font-semibold text-zinc-950 mb-2">
+                        {item.title}
+                      </h3>
+                      <p className="text-sm text-zinc-600 leading-relaxed mb-6">
+                        {item.description}
+                      </p>
+                    </div>
 
-            <div className="text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-6">
-                <Share2 className="w-6 h-6 text-gray-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Share anywhere</h3>
-              <p className="text-gray-600">
-                Get a shareable link, embed on your website, or integrate with your existing tools and workflows.
-              </p>
+                    <div className="pt-4 border-t border-zinc-200/70 flex items-center justify-between">
+                      <span className="text-[11px] font-mono text-zinc-500">
+                        {item.meta}
+                      </span>
+                      <Check className="w-3.5 h-3.5 text-zinc-400" />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Ready to build your AI assistant?
-          </h2>
-          <p className="text-gray-600 mb-8">
-            Join 10,000+ users who are already building with their data
-          </p>
-          <button className="bg-gray-900 text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors">
-            Get started for free
-          </button>
-          <div className="mt-4 text-sm text-gray-500">
-            No credit card required
+        {/* Video Walkthrough Section */}
+        <section id="demo" className="max-w-6xl mx-auto px-6 py-20">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+            <div>
+              <div className="text-xs font-mono uppercase tracking-wider text-zinc-400 mb-2">
+                Product Walkthrough
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-semibold text-zinc-950 tracking-tight">
+                See the ingestion & chat workflow
+              </h2>
+            </div>
+            <span className="text-xs font-mono text-zinc-500">
+              Runtime: ~2 min · End-to-end setup
+            </span>
           </div>
-        </div>
-      </section>
+
+          <div className="rounded-xl border border-zinc-200 bg-white p-2 shadow-sm">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-100 mb-2">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-zinc-200" />
+                <span className="w-2.5 h-2.5 rounded-full bg-zinc-200" />
+                <span className="w-2.5 h-2.5 rounded-full bg-zinc-200" />
+              </div>
+              <div className="text-[11px] font-mono text-zinc-400">
+                kstm.app/dashboard/create
+              </div>
+              <div className="w-10" />
+            </div>
+            <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-zinc-950">
+              <iframe
+                className="absolute top-0 left-0 w-full h-full"
+                src="https://www.youtube.com/embed/t4ynNrGij6I?si=hCY3SNSL3pvo1AN1"
+                title="KSTM Product Walkthrough"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Bottom CTA */}
+        <section className="border-t border-zinc-200/80 bg-white py-16">
+          <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div>
+              <h2 className="text-2xl font-semibold text-zinc-950 tracking-tight mb-1.5">
+                Ready to index your first knowledge base?
+              </h2>
+              <p className="text-sm text-zinc-600">
+                Create an account, upload your files or URLs, and test your assistant in the workspace.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <Link
+                href="/usecases"
+                className="border border-zinc-200 bg-white text-zinc-800 text-xs font-medium px-4 py-2.5 rounded-lg hover:bg-zinc-50 transition-colors"
+              >
+                Browse Use Cases
+              </Link>
+              <Link
+                href="/register"
+                className="bg-zinc-900 text-white text-xs font-medium px-5 py-2.5 rounded-lg hover:bg-zinc-800 transition-colors inline-flex items-center gap-1.5"
+              >
+                Get started
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 py-12">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center">
-          <div className="font-semibold text-gray-900 mb-4 md:mb-0">KSTM AI</div>
-          <div className="flex space-x-8 text-sm text-gray-600">
-            <a href="#" className="hover:text-gray-900 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-gray-900 transition-colors">Terms</a>
-            <a href="#" className="hover:text-gray-900 transition-colors">Support</a>
+      <footer className="border-t border-zinc-200/80 bg-zinc-50 py-8">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-5 h-5 rounded bg-zinc-900 text-white flex items-center justify-center font-mono text-[10px] font-semibold">
+              K
+            </div>
+            <span className="text-xs font-medium text-zinc-700">
+              KSTM — Knowledge-Grounded AI Assistants
+            </span>
+          </div>
+          <div className="flex items-center gap-6 text-xs text-zinc-500">
+            <Link href="/usecases" className="hover:text-zinc-900 transition-colors">
+              Use Cases
+            </Link>
+            <Link href="/login" className="hover:text-zinc-900 transition-colors">
+              Sign In
+            </Link>
+            <Link href="/register" className="hover:text-zinc-900 transition-colors">
+              Register
+            </Link>
+            <Link href="/dashboard" className="hover:text-zinc-900 transition-colors">
+              Workspace
+            </Link>
           </div>
         </div>
       </footer>
@@ -161,4 +326,4 @@ const DataMindLanding = () => {
   );
 };
 
-export default DataMindLanding;
+export default KSTMLanding;

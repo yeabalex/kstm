@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import List
 import requests
-import fitz  # PyMuPDF
+import pymupdf  # PyMuPDF
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
@@ -15,13 +15,13 @@ def create_cache_key(path: str) -> str:
     return hashlib.md5(path.encode("utf-8")).hexdigest()
 
 def read_pdf_from_local(file_path: str) -> str:
-    with fitz.open(file_path) as doc:
+    with pymupdf.open(file_path) as doc:
         return "\n".join(page.get_text() for page in doc)
 
 def read_pdf_from_url(url: str) -> str:
     response = requests.get(url, timeout=30)
     if response.status_code == 200:
-        with fitz.open(stream=io.BytesIO(response.content), filetype="pdf") as doc:
+        with pymupdf.open(stream=io.BytesIO(response.content), filetype="pdf") as doc:
             return "\n".join(page.get_text() for page in doc)
     else:
         logger.error("Failed to fetch PDF from %s, status code: %d", url, response.status_code)
@@ -34,11 +34,14 @@ def read_pdf(file_path: str) -> str:
 
 def load_and_process_pdf(
     file_path: str,
-    chunk_size: int = 1000,
-    chunk_overlap: int = 200,
+    chunk_size: int = 4000,
+    chunk_overlap: int = 300,
     cache_dir: Path = Path(".cache/pdf"),
     refresh: bool = False,
 ) -> List[Document]:
+    if isinstance(chunk_size, bool):
+        refresh = chunk_size
+        chunk_size = 4000
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_key = create_cache_key(file_path)
     cache_path = cache_dir / f"{cache_key}.json"
@@ -47,8 +50,9 @@ def load_and_process_pdf(
         try:
             with open(cache_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                logger.info("Loaded PDF from JSON cache: %s", file_path)
-                return [Document(page_content=d["page_content"], metadata=d["metadata"]) for d in data]
+                if data:
+                    logger.info("Loaded PDF from JSON cache: %s", file_path)
+                    return [Document(page_content=d["page_content"], metadata=d["metadata"]) for d in data]
         except Exception as e:
             logger.warning("PDF Cache load failed: %s. Reloading.", e)
 
@@ -74,4 +78,4 @@ def load_and_process_pdf(
         return documents
     except Exception as e:
         logger.error("Error processing PDF %s: %s", file_path, e)
-        return []
+        raise

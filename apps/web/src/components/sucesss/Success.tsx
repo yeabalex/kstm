@@ -1,173 +1,208 @@
-import { useState } from 'react';
-import { NEXT_JS_PROXY_URL } from '@/const';
-import { Check, Copy, Share2, Code, ExternalLink, ChevronRight, Rocket, MessageSquare, Settings } from 'lucide-react';
+import { useState } from "react";
+import { NEXT_JS_PROXY_URL } from "@/const";
+import {
+  Check,
+  Copy,
+  Share2,
+  Code,
+  ArrowUpRight,
+  Plus,
+  ArrowLeft,
+  CheckCircle2,
+} from "lucide-react";
+import Link from "next/link";
 
-export default function BotTrainingSuccess({ 
-  botName, 
-  botId, 
+export default function BotTrainingSuccess({
+  botName,
+  botId,
   kbId,
   onGoToChat = () => {},
-  domain = NEXT_JS_PROXY_URL
-}:
-{
-    botName: string | null;
-    botId: string | null;
-    kbId: string | null;
-    onGoToChat?: () => void;
-    domain?: string;
+  onReset,
+  domain = NEXT_JS_PROXY_URL,
+}: {
+  botName: string | null;
+  botId: string | null;
+  kbId: string | null;
+  onGoToChat?: () => void;
+  onReset?: () => void;
+  domain?: string;
 }) {
   const [copyStatus, setCopyStatus] = useState({
     shareLink: false,
-    embedCode: false
+    embedCode: false,
   });
-  
-  const shareUrl = `${domain}/chat/${botId}/${kbId}`;
-  const embedCode = `<iframe src="${shareUrl}/embed" width="100%" height="600px" frameborder="0"></iframe>`;
-  
-  const copyToClipboard = (text:string, type:string) => {
+
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : domain;
+  const shareUrl = `${origin}/chat/${botId}/${kbId}`;
+  const embedCode = `<iframe src="${shareUrl}" width="100%" height="600" style="border:1px solid #e4e4e7;border-radius:12px;" allow="clipboard-write"></iframe>`;
+
+  const copyToClipboard = (text: string, type: "shareLink" | "embedCode") => {
     navigator.clipboard.writeText(text);
-    setCopyStatus(prev => ({ ...prev, [type]: true }));
+    setCopyStatus((prev) => ({ ...prev, [type]: true }));
     setTimeout(() => {
-      setCopyStatus(prev => ({ ...prev, [type]: false }));
+      setCopyStatus((prev) => ({ ...prev, [type]: false }));
     }, 2000);
   };
 
   return (
-    <div className="p-6 rounded-xl">
-      {/* Header Section with Animation */}
-      <div className="flex items-start mb-8">
-        <div className="p-3 bg-green-500 rounded-lg shadow-lg transform -rotate-3">
-          <Rocket size={32} className="text-white" />
-        </div>
-        <div className="ml-4">
-          <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-500 to-blue-600">
-            {botName} is live!
-          </h1>
-          <p className="text-gray-600 mt-1">Your new AI assistant is ready to help your users</p>
-        </div>
-      </div>
-
-      {/* Main Content in Grid Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Column - Bot Info */}
-        <div className="bg-white p-6 rounded-xl shadow-md transform hover:scale-105 transition-transform duration-300">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-            <MessageSquare size={20} className="mr-2 text-blue-500" />
-            Bot Details
-          </h2>
-          
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm text-gray-500">Bot Name</p>
-              <p className="font-medium">{botName}</p>
+    <div className="min-h-full bg-zinc-50 p-6 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Top Banner */}
+        <div className="bg-white border border-zinc-200/90 rounded-xl p-6 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
-            
             <div>
-              <p className="text-sm text-gray-500">Bot ID</p>
-              <p className="font-mono text-sm bg-gray-50 p-1 rounded">{botId}</p>
-            </div>
-            
-            <div className="pt-4">
-              <button 
-                onClick={onGoToChat}
-                className="w-full bg-black text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center group"
-              >
-                Go to Chat
-                <ChevronRight size={18} className="ml-2 transform group-hover:translate-x-1 transition-transform" />
-              </button>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-zinc-950 tracking-tight">
+                  {botName || "Assistant"} is deployed
+                </h1>
+                <span className="text-[10px] font-mono uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded">
+                  READY
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 mt-1">
+                Knowledge base ingestion has been queued and your assistant endpoint is live.
+              </p>
             </div>
           </div>
+
+          <button
+            onClick={onGoToChat}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-lg transition-colors shrink-0 self-start sm:self-auto"
+          >
+            <span>Open Assistant Chat</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </button>
         </div>
-        
-        {/* Middle Column - Share Link */}
-        <div className="bg-white p-6 rounded-xl shadow-md relative overflow-hidden">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-blue-100 rounded-full opacity-50"></div>
-          <div className="absolute -left-4 -bottom-4 w-16 h-16 bg-green-100 rounded-full opacity-50"></div>
-          
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-            <Share2 size={20} className="mr-2 text-purple-500" />
-            Share Your Bot
-          </h2>
-          
-          <div className="relative">
-            <div className="mb-6">
-              <p className="text-sm text-gray-600 mb-2">Anyone with this link can access your bot:</p>
-              <div className="flex">
-                <input 
-                  type="text" 
-                  value={shareUrl} 
-                  readOnly 
-                  className="bg-gray-50 p-3 rounded-l-lg border border-gray-200 flex-grow text-sm font-mono"
+
+        {/* Details Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Endpoint Metadata & Direct Share URL */}
+          <div className="bg-white border border-zinc-200/90 rounded-xl p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <Share2 className="w-4 h-4 text-zinc-500" />
+                <h2 className="text-sm font-semibold text-zinc-950">
+                  Direct Chat Endpoint
+                </h2>
+              </div>
+
+              <div className="space-y-3 mb-5">
+                <div className="flex items-center justify-between py-1.5 border-b border-zinc-100 text-xs">
+                  <span className="text-zinc-500">Assistant ID</span>
+                  <code className="font-mono text-zinc-800 bg-zinc-50 px-1.5 py-0.5 rounded border border-zinc-200/70">
+                    {botId}
+                  </code>
+                </div>
+                <div className="flex items-center justify-between py-1.5 border-b border-zinc-100 text-xs">
+                  <span className="text-zinc-500">Knowledge Base ID</span>
+                  <code className="font-mono text-zinc-800 bg-zinc-50 px-1.5 py-0.5 rounded border border-zinc-200/70">
+                    {kbId}
+                  </code>
+                </div>
+              </div>
+
+              <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                Shareable URL
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={shareUrl}
+                  readOnly
+                  className="bg-zinc-50 px-3 py-2 rounded-lg border border-zinc-200 flex-1 text-xs font-mono text-zinc-700 focus:outline-none"
                 />
-                <button 
-                  onClick={() => copyToClipboard(shareUrl, 'shareLink')}
-                  className="bg-gray-100 hover:bg-gray-200 px-3 rounded-r-lg border border-l-0 border-gray-200"
+                <button
+                  onClick={() => copyToClipboard(shareUrl, "shareLink")}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-medium text-zinc-700 transition-colors shrink-0"
                 >
                   {copyStatus.shareLink ? (
-                    <Check size={18} className="text-green-600" />
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Copied</span>
+                    </>
                   ) : (
-                    <Copy size={18} className="text-gray-600" />
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-zinc-500" />
+                      <span>Copy</span>
+                    </>
                   )}
                 </button>
               </div>
-              {copyStatus.shareLink && (
-                <p className="text-green-600 text-xs mt-1 animate-pulse">Copied to clipboard!</p>
-              )}
             </div>
-            
-            <button className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center">
-              <Settings size={14} className="mr-1" />
-              Customize sharing settings
-            </button>
+
+            <p className="text-[11px] text-zinc-400 mt-4">
+              You can toggle public or private access at any time from the workspace card menu.
+            </p>
           </div>
-        </div>
-        
-        {/* Right Column - Embed Code */}
-        <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-purple-500">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-            <Code size={20} className="mr-2 text-gray-800" />
-            Embed on Website
-          </h2>
-          
-          <div>
-            <p className="text-sm text-gray-600 mb-3">Add this code to your website:</p>
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs font-mono h-32 overflow-auto">
-              {embedCode}
+
+          {/* Website Embed Snippet */}
+          <div className="bg-white border border-zinc-200/90 rounded-xl p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Code className="w-4 h-4 text-zinc-500" />
+                  <h2 className="text-sm font-semibold text-zinc-950">
+                    Embed via Iframe
+                  </h2>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-400">HTML</span>
+              </div>
+
+              <p className="text-xs text-zinc-500 mb-3">
+                Paste this snippet into any documentation page or internal portal:
+              </p>
+
+              <pre className="bg-zinc-950 text-zinc-200 p-3.5 rounded-lg text-[11px] font-mono overflow-x-auto leading-relaxed">
+                {embedCode}
+              </pre>
             </div>
-            
-            <div className="mt-4 flex justify-between items-center">
-              <span className="text-xs text-gray-500">Responsive iframe embed code</span>
-              <button 
-                onClick={() => copyToClipboard(embedCode, 'embedCode')}
-                className="flex items-center text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded text-gray-700"
+
+            <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between">
+              <span className="text-[11px] text-zinc-400">
+                Responsive container
+              </span>
+              <button
+                onClick={() => copyToClipboard(embedCode, "embedCode")}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-medium text-zinc-700 transition-colors"
               >
                 {copyStatus.embedCode ? (
                   <>
-                    <Check size={14} className="mr-1" />
-                    Copied!
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Copied snippet</span>
                   </>
                 ) : (
                   <>
-                    <Copy size={14} className="mr-1" />
-                    Copy Code
+                    <Copy className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Copy snippet</span>
                   </>
                 )}
               </button>
             </div>
           </div>
         </div>
-      </div>
-      
-      {/* Footer Actions */}
-      <div className="mt-8 flex justify-between items-center">
-        <button className="text-blue-600 hover:text-blue-800 font-medium flex items-center">
-          <ExternalLink size={18} className="mr-1" />
-          View all bots
-        </button>
-        
-        <button className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg">
-          Create Another Bot
-        </button>
+
+        {/* Footer Navigation */}
+        <div className="flex items-center justify-between pt-2">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-950 transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Assistants</span>
+          </Link>
+
+          <button
+            onClick={() => (onReset ? onReset() : window.location.reload())}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-medium text-zinc-800 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Create Another Assistant</span>
+          </button>
+        </div>
       </div>
     </div>
   );

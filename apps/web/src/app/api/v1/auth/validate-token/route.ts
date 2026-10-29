@@ -18,7 +18,6 @@ export async function GET() {
 
   try {
     const data = validateToken(token);
-    console.log(data);
     return NextResponse.json(data);
   } catch (error) {
     return new Response(JSON.stringify({ error: "Internal server error" }), {

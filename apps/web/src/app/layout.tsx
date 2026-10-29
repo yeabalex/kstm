@@ -1,40 +1,49 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans } from "next/font/google";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import clsx from "clsx";
-import Cog from "@/assets/logo-acme.png"
-import Head from "next/head";
+import Cog from "@/assets/logo-acme.png";
 
-const dmSans = DM_Sans({ subsets: ["latin"] });
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
+
 export const metadata: Metadata = {
-  title: "KoolSales | AI Sales Bot for Marketplaces",
-  icons:{
-    icon:"/cog.ico"
+  title: {
+    default: "KSTM — Knowledge-Grounded AI Assistants",
+    template: "%s · KSTM",
+  },
+  icons: {
+    icon: "/cog.ico",
   },
   description:
-    "KoolSales is an AI-powered, human-like sales chatbot built for social media and marketplace platforms. Designed with Next.js, Tailwind CSS, and Framer Motion, the landing page is sleek, responsive, and optimized for mobile.",
+    "Deploy retrieval-grounded AI assistants over PDF, CSV, JSON, TXT, and live web documentation in minutes.",
   openGraph: {
-    title: "KoolSales | AI Sales Bot for Marketplaces",
+    title: "KSTM — Knowledge-Grounded AI Assistants",
     description:
-      "KoolSales is an AI-powered, human-like sales chatbot built for social media and marketplace platforms. Designed with Next.js, Tailwind CSS, and Framer Motion, the landing page is sleek, responsive, and optimized for mobile.",
+      "Deploy retrieval-grounded AI assistants over PDF, CSV, JSON, TXT, and live web documentation in minutes.",
     type: "website",
     locale: "en_US",
     images: [
       {
-        url: Cog.src, // Update if needed
+        url: Cog.src,
         width: 1784,
         height: 892,
-        alt: "KoolSales AI Bot Preview",
+        alt: "KSTM Platform Preview",
       },
     ],
   },
 };
 
-
-// Viewport configuration
 export const viewport: Viewport = {
-  themeColor: '#93A5E5', // Theme color for the website
-}
+  themeColor: "#09090b",
+};
 
 export default function RootLayout({
   children,
@@ -42,13 +51,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="relative">
+    <html lang="en" className={clsx("relative", dmSans.variable, jetbrainsMono.variable)}>
       <head>
         <link rel="icon" href="/img/favicon.ico" sizes="any" />
       </head>
-      <body className={clsx(dmSans.className, "antialiased bg-[#EAEEFE]")}>
-        
-              {children}
+      <body
+        className={clsx(
+          dmSans.className,
+          "antialiased bg-zinc-50 text-zinc-900 selection:bg-zinc-900 selection:text-white"
+        )}
+      >
+        {children}
       </body>
     </html>
   );

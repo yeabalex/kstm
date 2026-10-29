@@ -11,14 +11,17 @@ async function bootstrap() {
   // Trust reverse proxy (for rate limiting client IP detection behind proxies/load balancers)
   app.set('trust proxy', 1);
 
-  const corsOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
-    : [
-        'http://localhost:8080',
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'https://localhost:3001',
-      ];
+  const defaultOrigins = [
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://localhost:3001',
+  ];
+  const envOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : [];
+  const corsOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
   // Enable CORS
   app.enableCors({
