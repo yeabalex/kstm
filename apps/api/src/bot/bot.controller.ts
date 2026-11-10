@@ -41,7 +41,9 @@ export class BotController {
       throw new BadRequestException('Missing userId in query parameters');
     }
     if (req?.user?.userId && req.user.userId !== targetUserId) {
-      throw new ForbiddenException('Cannot access assistants belonging to another user');
+      throw new ForbiddenException(
+        'Cannot access assistants belonging to another user',
+      );
     }
     return this.botService.getAllBots(targetUserId);
   }
@@ -58,7 +60,9 @@ export class BotController {
     @Req() req?: AuthenticatedRequest,
   ) {
     if (req?.user?.userId && req.user.userId !== createBotDto.user_id) {
-      throw new ForbiddenException('Cannot create an assistant for another user');
+      throw new ForbiddenException(
+        'Cannot create an assistant for another user',
+      );
     }
     return this.botService.createBot(createBotDto);
   }

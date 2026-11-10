@@ -1,12 +1,18 @@
+jest.mock('@nestjs/bullmq', () => {
+  const { Inject } = jest.requireActual('@nestjs/common');
+  return {
+    InjectQueue: (name?: string) =>
+      Inject(name ? `BullQueue_${name}` : 'BullQueue_default'),
+    getQueueToken: (name?: string) =>
+      name ? `BullQueue_${name}` : 'BullQueue_default',
+  };
+});
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { BotService } from './bot.service';
 import { PrismaService } from '../services/prisma.service';
-import axios from 'axios';
-
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('BotService', () => {
   let service: BotService;
@@ -28,6 +34,12 @@ describe('BotService', () => {
     },
   };
 
+  const mockQueue = {
+    add: jest.fn().mockResolvedValue({ id: 'job-123' }),
+    getJob: jest.fn(),
+    getJobs: jest.fn().mockResolvedValue([]),
+  };
+
   const mockConfigService = {
     get: jest.fn().mockReturnValue('http://localhost:8000'),
   };
@@ -38,6 +50,7 @@ describe('BotService', () => {
         BotService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: 'BullQueue_kb-ingestion', useValue: mockQueue },
       ],
     }).compile();
 
@@ -129,15 +142,12 @@ describe('BotService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should create bot and decrement free tier when free tier is active', async () => {
+    it('should create bot, decrement free tier, and queue ingestion job', async () => {
       mockPrisma.userSubscription.findUnique.mockResolvedValue(null);
       mockPrisma.freeTier.findUnique.mockResolvedValue({ freeUrlCredit: 2 });
-      mockedAxios.post.mockResolvedValue({
-        status: 200,
-        data: { status: 'success' },
-      });
       mockPrisma.bot.create.mockResolvedValue({ id: 'b-1' });
       mockPrisma.freeTier.updateMany.mockResolvedValue({ count: 1 });
+      mockQueue.add.mockResolvedValue({ id: 'b-1' });
 
       const result = await service.createBot({
         user_id: 'u-1',
@@ -148,7 +158,17 @@ describe('BotService', () => {
 
       expect(result.bot_id).toBe('b-1');
       expect(result.usedFreeTier).toBe(true);
+      expect(mockPrisma.bot.create).toHaveBeenCalled();
       expect(mockPrisma.freeTier.updateMany).toHaveBeenCalled();
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'index-kb',
+        expect.objectContaining({
+          bot_id: 'b-1',
+          kb_id: 'kb-1',
+          user_id: 'u-1',
+        }),
+        { jobId: 'b-1' },
+      );
     });
   });
 });

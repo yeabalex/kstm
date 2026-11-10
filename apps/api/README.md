@@ -1,19 +1,26 @@
-# KSTM-AI NestJS API Gateway & Backend
+# @kstm/api — NestJS API Gateway & RAG Engine
 
-Production-ready NestJS backend microservice powering the KSTM-AI knowledge base & conversational bot platform. Handles authentication, Stripe subscription billing, bot customization, relational metadata via Prisma (PostgreSQL), and proxies RAG retrieval requests to the FastAPI AI microservice.
+Production-grade NestJS backend microservice powering the KSTM platform. Handles authentication, Stripe subscription billing, bot persona customization, relational metadata via Prisma (PostgreSQL), asynchronous document ingestion queuing via BullMQ, and high-performance native RAG vector retrieval from Neo4j with Google Gemini and local multilingual fallback embeddings.
 
 ---
 
 ## Architecture Overview
 
 ```mermaid
-flowchart LR
-    Client[Web Frontend / Client] -->|REST API + JWT| NestAPI[NestJS API Gateway]
-    NestAPI -->|CRUD & Relations| Postgres[(PostgreSQL / Prisma)]
-    NestAPI -->|Credit / Token Cache| Redis[(Redis Cache)]
-    NestAPI -->|RAG Ingestion & Queries| FastAPI[FastAPI AI Service]
-    FastAPI -->|Vector Embeddings| Neo4j[(Neo4j Vector DB)]
-    Stripe[Stripe Webhooks] -->|Raw Body Verification| NestAPI
+flowchart TD
+    Client[Web Frontend / Client] -->|REST API + JWT| NestAPI[NestJS Gateway]
+    NestAPI -->|CRUD & Metadata| Postgres[(PostgreSQL / Prisma)]
+    NestAPI -->|Session & Credit Cache| Redis[(Redis Cache)]
+    NestAPI -->|Enqueue Ingestion Job| BullMQ[(BullMQ Queue: kb-ingestion)]
+    BullMQ -->|Async Processing| PyWorker[Python AI Worker]
+    PyWorker -->|Store Vectors & Nodes| Neo4j[(Neo4j Vector DB)]
+    
+    subgraph Native RAG Query Execution
+        NestAPI -->|Semantic Similarity Search| Neo4j
+        NestAPI -->|LLM Synthesis Gemini 2.0/2.5| LLM[Google Gemini API]
+    end
+    
+    Stripe[Stripe Webhooks] -->|Webhook Verification| NestAPI
 ```
 
 ---
@@ -21,121 +28,70 @@ flowchart LR
 ## Tech Stack & Core Dependencies
 
 - **Framework**: [NestJS 10](https://nestjs.com/) (TypeScript)
-- **Database & ORM**: PostgreSQL 16 with [Prisma ORM 6](https://www.prisma.io/)
+- **Database & ORM**: PostgreSQL 17 with [Prisma ORM 6](https://www.prisma.io/)
+- **Distributed Queue**: BullMQ (`@nestjs/bullmq`) with Redis
+- **Vector Search & Storage**: Neo4j (`neo4j-driver`) with vector similarity index
+- **LLM & Embeddings**: Google GenAI SDK (`@google/genai`) with local multilingual embedding fallback
 - **Authentication**: Passport.js, `@nestjs/jwt`, `bcrypt`
-- **Cache & Rate Limiting**: Redis with `ioredis` & `@nestjs/cache-manager`
+- **Cache & Rate Limiting**: Redis with `ioredis` & `@nestjs/throttler`
 - **Validation**: Schema-level Zod & Class-Validator DTOs
 - **Payment Processing**: Stripe SDK (`stripe`) with cryptographic webhook signature verification
-- **Testing**: Jest unit & service integration test suite
+- **Testing**: Jest unit & service test suite
 
 ---
 
 ## Key Features
 
 - **Robust Authentication & Access Control**: Secure bcrypt password hashing, JWT strategy guards, sanitized user payloads, and automatic Free Tier credit initialization.
-- **Bot & Knowledge Base Management**: Create, customize, and configure bot personas, temperature, system prompts, and multi-source knowledge bases (PDF, CSV, TXT, JSON, Web URLs).
+- **Asynchronous Ingestion Queuing**: Offloads document parsing and vector indexing to background BullMQ workers without blocking client requests.
+- **Native NestJS RAG Retrieval**: Direct vector search against Neo4j indices and context synthesis using Gemini 2.5 Flash.
+- **Embedding Fallback Resilience**: Falls back to deterministic local multilingual embeddings if external API quotas are exhausted.
 - **Stripe Subscription Lifecycle**: Checkout session creation and event-driven webhook processing (`invoice.payment_succeeded`, `customer.subscription.deleted`) for tiered access.
-- **RAG Proxy & Credit Enforcement**: Pre-validates user subscription/credit allowances before delegating vector queries to the FastAPI engine.
 - **Enterprise Error Handling & Logging**: Standardized NestJS `HttpException` hierarchy with structured NestJS `Logger`.
 
 ---
 
 ## API Endpoints
 
-### Authentication (`/auth`)
-- `POST /auth/login` - Authenticate user credentials and issue JWT access token.
-- `POST /auth/validate` - Verify JWT token validity.
+### Authentication (`/api/v1/auth`)
+- `POST /api/v1/auth/login` - Authenticate user credentials and issue JWT access token.
+- `POST /api/v1/auth/validate` - Verify JWT token validity.
 
-### Users (`/user`)
-- `POST /user/register` - Register a new user and initialize Free Tier credits.
-- `GET /user/:id` - Fetch user profile metadata.
+### Users (`/api/v1/user`)
+- `POST /api/v1/user/register` - Register a new user and initialize Free Tier credits.
+- `GET /api/v1/user/:id` - Fetch user profile metadata.
 
-### Bots & Knowledge Bases (`/bot`)
-- `POST /bot/create` - Provision bot persona and trigger multi-source knowledge base ingestion.
-- `GET /bot/all/:userId` - Retrieve all bots owned by a user.
-- `GET /bot/detail/:botId` - Fetch detailed bot configuration and knowledge sources.
-- `PATCH /bot/access` - Toggle bot public/private visibility.
+### Bots & Knowledge Bases (`/api/v1/bot`)
+- `POST /api/v1/bot/create` - Provision bot persona and enqueue multi-source ingestion job in BullMQ.
+- `GET /api/v1/bot/status/:botId` - Real-time polling endpoint for BullMQ background indexing status.
+- `GET /api/v1/bot/all/:userId` - Retrieve all bots owned by a user.
+- `GET /api/v1/bot/detail/:botId` - Fetch detailed bot configuration and knowledge sources.
+- `PATCH /api/v1/bot/access` - Toggle bot public/private visibility.
 
-### Knowledge Base Queries (`/query`)
-- `POST /query/ask` - Validate user credits, forward query to FastAPI AI engine, and decrement chat credits.
+### Conversational Retrieval (`/api/v1/query`)
+- `POST /api/v1/query/ask` - Validate user credits, run Neo4j similarity search, synthesize response with Gemini, and manage session turns in Redis.
+- `GET /api/v1/query/sessions/:botId` - Fetch conversational history sessions for a bot.
 
-### Stripe Billing (`/stripe`)
-- `POST /stripe/checkout` - Create Stripe subscription checkout session.
-- `POST /stripe/webhook` - Handle asynchronous Stripe lifecycle events with raw body signature verification.
-
----
-
-## Getting Started
-
-### Prerequisites
-- Node.js >= 20.x
-- PostgreSQL instance
-- Redis server
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yeabalex/KSTM-AI-NESTJS_BACKEND.git
-cd KSTM-AI-NESTJS_BACKEND
-
-# Install dependencies
-npm ci
-```
-
-### Environment Configuration
-
-Copy `.env.example` to `.env` and configure your credentials:
-
-```bash
-cp .env.example .env
-```
-
-### Database Migration
-
-```bash
-# Generate Prisma Client and run migrations
-npx prisma generate
-npx prisma db push
-```
-
-### Running the Application
-
-```bash
-# Development mode with hot-reload
-npm run start:dev
-
-# Production build
-npm run build
-npm run start:prod
-```
-
-### Running Tests & Linting
-
-```bash
-# Execute Jest unit and service test suites
-npm test
-
-# Run ESLint validation and auto-fixes
-npm run lint
-```
+### Stripe Billing (`/api/v1/stripe`)
+- `POST /api/v1/stripe/checkout` - Create Stripe subscription checkout session.
+- `POST /api/v1/stripe/webhook` - Handle asynchronous Stripe lifecycle events with raw body signature verification.
 
 ---
 
-## Docker Deployment
+## Development & Testing
 
-Build and run the standalone containerized service:
+This package is managed inside the KSTM Turborepo monorepo.
 
 ```bash
-# Build Docker image
-docker build -t kstm-nestjs-backend .
+# Run database migrations
+pnpm --filter @kstm/api run db:migrate
 
-# Run container
-docker run -p 3000:3000 --env-file .env kstm-nestjs-backend
+# Start development server
+pnpm --filter @kstm/api run dev
+
+# Run unit tests
+pnpm --filter @kstm/api test
+
+# Run linter
+pnpm --filter @kstm/api run lint
 ```
-
----
-
-## License
-
-MIT License. Designed and built by [Yeab Alex](https://github.com/yeabalex).

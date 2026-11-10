@@ -10,7 +10,9 @@ interface JwtStrategyPayload {
   lastName?: string;
 }
 
-const cookieExtractor = (req: { headers?: { cookie?: string } }): string | null => {
+const cookieExtractor = (req: {
+  headers?: { cookie?: string };
+}): string | null => {
   const cookieHeader = req?.headers?.cookie;
   if (!cookieHeader || typeof cookieHeader !== 'string') return null;
   const match = cookieHeader
@@ -25,9 +27,12 @@ const cookieExtractor = (req: { headers?: { cookie?: string } }): string | null 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(configService: ConfigService) {
-    const secret = configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
+    const secret =
+      configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
     if (!secret) {
-      throw new Error('CRITICAL: JWT_SECRET environment variable is not configured.');
+      throw new Error(
+        'CRITICAL: JWT_SECRET environment variable is not configured.',
+      );
     }
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([

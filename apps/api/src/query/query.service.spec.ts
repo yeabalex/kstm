@@ -1,13 +1,26 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
-import { ForbiddenException } from '@nestjs/common';
-import { QueryService } from './query.service';
-import { PrismaService } from '../services/prisma.service';
-import axios from 'axios';
-import redis from '../utils/redis';
+jest.mock('neo4j-driver', () => ({
+  __esModule: true,
+  default: {
+    driver: jest.fn().mockReturnValue({
+      session: jest.fn().mockReturnValue({
+        run: jest.fn().mockResolvedValue({ records: [] }),
+        close: jest.fn().mockResolvedValue(undefined),
+      }),
+      close: jest.fn().mockResolvedValue(undefined),
+    }),
+    auth: {
+      basic: jest.fn(),
+    },
+  },
+}));
 
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+jest.mock('@google/genai', () => ({
+  GoogleGenAI: jest.fn().mockImplementation(() => ({
+    models: {
+      generateContent: jest.fn().mockResolvedValue({ text: 'RAG response' }),
+    },
+  })),
+}));
 
 jest.mock('../utils/redis', () => ({
   __esModule: true,
@@ -17,6 +30,13 @@ jest.mock('../utils/redis', () => ({
     on: jest.fn(),
   },
 }));
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { ForbiddenException } from '@nestjs/common';
+import { QueryService } from './query.service';
+import { PrismaService } from '../services/prisma.service';
+import redis from '../utils/redis';
 
 describe('QueryService', () => {
   let service: QueryService;
@@ -30,10 +50,19 @@ describe('QueryService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    bot: {
+      findUnique: jest.fn(),
+    },
   };
 
   const mockConfigService = {
-    get: jest.fn().mockReturnValue('http://localhost:8000'),
+    get: jest.fn().mockImplementation((key: string) => {
+      if (key === 'NEO4J_URI') return 'bolt://localhost:7687';
+      if (key === 'NEO4J_USER') return 'neo4j';
+      if (key === 'NEO4J_PASSWORD') return 'password123';
+      if (key === 'GEMINI_API_KEY') return 'test-api-key';
+      return null;
+    }),
   };
 
   beforeEach(async () => {
@@ -72,9 +101,9 @@ describe('QueryService', () => {
       (redis.get as jest.Mock).mockResolvedValue(
         JSON.stringify({ endDate: activeEndDate }),
       );
-      mockedAxios.post.mockResolvedValue({
-        data: { answer: 'Hello! How can I help you today?' },
-      });
+      jest.spyOn(service, 'executeRagQuery').mockResolvedValue({
+        externalData: { answer: 'Hello! How can I help you today?' },
+      } as any);
 
       const result = await service.query(queryDto);
 
@@ -94,14 +123,15 @@ describe('QueryService', () => {
         id: 1,
         freeChatCredit: 4,
       });
-      mockedAxios.post.mockResolvedValue({
-        data: { answer: 'Free tier answer' },
-      });
+      jest.spyOn(service, 'executeRagQuery').mockResolvedValue({
+        externalData: { answer: 'Free tier answer' },
+      } as any);
 
       const result = await service.query(queryDto);
 
       expect(result.message).toContain('Free Tier credit used');
       expect(mockPrisma.freeTier.update).toHaveBeenCalled();
+      expect(result.externalData.answer).toBe('Free tier answer');
     });
 
     it('should throw ForbiddenException when no active subscription and 0 free credits', async () => {

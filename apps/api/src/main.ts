@@ -19,7 +19,9 @@ async function bootstrap() {
     'https://localhost:3001',
   ];
   const envOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+    ? process.env.CORS_ORIGINS.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
     : [];
   const corsOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 

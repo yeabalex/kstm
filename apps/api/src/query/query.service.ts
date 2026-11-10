@@ -40,8 +40,7 @@ export class QueryService implements OnModuleDestroy {
     // Initialize Neo4j Driver
     const neo4jUri =
       this.configService.get<string>('NEO4J_URI') || 'bolt://localhost:7687';
-    const neo4jUser =
-      this.configService.get<string>('NEO4J_USER') || 'neo4j';
+    const neo4jUser = this.configService.get<string>('NEO4J_USER') || 'neo4j';
     const neo4jPassword =
       this.configService.get<string>('NEO4J_PASSWORD') || 'password123';
 
@@ -145,7 +144,13 @@ export class QueryService implements OnModuleDestroy {
       const promptTemplate =
         bot?.prompt_template ||
         'You are a helpful AI assistant. Answer the user query using the provided context.';
-      const legacyModels = new Set(['gemini-pro', 'gemini-ultra', 'gemini-1.0-pro', 'gemini-1.5-flash', 'gemini-1.5-pro']);
+      const legacyModels = new Set([
+        'gemini-pro',
+        'gemini-ultra',
+        'gemini-1.0-pro',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
+      ]);
       const targetModel =
         bot?.model && !legacyModels.has(bot.model)
           ? bot.model
@@ -208,7 +213,9 @@ export class QueryService implements OnModuleDestroy {
           sevenDaysInSeconds,
         )
         .catch((err) =>
-          this.logger.warn(`Failed to update Redis chat memory: ${err.message}`),
+          this.logger.warn(
+            `Failed to update Redis chat memory: ${err.message}`,
+          ),
         );
 
       // Permanent persistence to PostgreSQL via Prisma
@@ -366,12 +373,10 @@ export class QueryService implements OnModuleDestroy {
       });
 
       if (dbMessages && dbMessages.length > 0) {
-        const formatted: MemoryMessage[] = dbMessages
-          .reverse()
-          .map((m) => ({
-            role: m.role === 'human' ? 'human' : 'ai',
-            content: m.content,
-          }));
+        const formatted: MemoryMessage[] = dbMessages.reverse().map((m) => ({
+          role: m.role === 'human' ? 'human' : 'ai',
+          content: m.content,
+        }));
 
         const sevenDaysInSeconds = 7 * 24 * 60 * 60;
         await redis.set(
@@ -423,7 +428,9 @@ export class QueryService implements OnModuleDestroy {
         ],
       });
     } catch (dbErr) {
-      this.logger.warn(`Failed to persist chat session/message: ${dbErr.message}`);
+      this.logger.warn(
+        `Failed to persist chat session/message: ${dbErr.message}`,
+      );
     }
   }
 

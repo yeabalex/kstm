@@ -1,6 +1,6 @@
-# KSTM-AI FastAPI Intelligence & RAG Microservice
+# @kstm/ai-service — AI Ingestion & Document Processing Worker
 
-High-performance asynchronous AI microservice engineered with FastAPI, LangChain, Google Gemini, Neo4j Vector DB, and Redis. Provides multi-modal knowledge base ingestion (PDF, CSV, TXT, JSON, and dynamic web scraping) and contextual RAG conversational retrieval with persistent session memory.
+High-performance Python background worker powering knowledge base ingestion for KSTM. Consumes asynchronous jobs from Redis via BullMQ, extracts content across diverse formats (PDF, CSV, TXT, JSON, and dynamic JavaScript web pages using headless Selenium), generates vector embeddings (Google Gemini and local multilingual fallback), and indexes chunks into Neo4j vector storage.
 
 ---
 
@@ -8,128 +8,81 @@ High-performance asynchronous AI microservice engineered with FastAPI, LangChain
 
 ```mermaid
 flowchart TD
-    Request[NestJS Gateway Request] --> FastAPI[FastAPI AI Service]
+    Queue[(Redis / BullMQ: kb-ingestion)] -->|Pop Job: index-kb| Worker[BullMQ Worker: worker.py]
     
-    subgraph Ingestion Pipeline
-        FastAPI --> Ingest{Multi-Modal Ingest}
-        Ingest -->|PDF / PyMuPDF| DocSplitter[Recursive Character Text Splitter]
-        Ingest -->|CSV / TXT / JSON| DocSplitter
-        Ingest -->|Web URLs| HeadlessChrome[Headless Selenium + BeautifulSoup]
-        HeadlessChrome --> DocSplitter
-        DocSplitter --> JSONCache[(JSON Document Cache)]
-        DocSplitter --> Embeddings[Gemini text-embedding-004]
-        Embeddings --> Neo4j[(Neo4j Vector Index)]
+    subgraph Multi-Modal Extraction
+        Worker --> Router{Document Type}
+        Router -->|PDF| PDFParser[PyMuPDF / fitz]
+        Router -->|CSV / TXT / JSON| TextParsers[Structured Parsers]
+        Router -->|Web URLs| Scraper[Headless Chromium + Selenium]
     end
-
-    subgraph Retrieval & Synthesis
-        FastAPI --> QueryHandler[RAG Query Pipeline]
-        QueryHandler --> RedisMem[(Redis Chat History)]
-        QueryHandler --> VectorSearch[Neo4j Similarity Search]
-        VectorSearch --> StuffChain[Combine Documents Chain]
-        StuffChain --> LLM[Google Gemini 2.0 Flash]
-        LLM --> StreamResponse[Synthesized Answer]
+    
+    subgraph Chunking & Vectorization
+        PDFParser --> Splitter[Recursive Character Text Splitter]
+        TextParsers --> Splitter
+        Scraper --> Splitter
+        Splitter --> Embedder{Embedding Provider}
+        Embedder -->|Primary| Gemini[Google text-embedding-004]
+        Embedder -->|Fallback / Offline| LocalEmbed[Local Multilingual 768d]
+        Gemini --> Neo4j[(Neo4j Vector DB)]
+        LocalEmbed --> Neo4j
     end
+    
+    Worker -->|Update Progress & Status| RedisState[(Redis / Bot Status)]
 ```
 
 ---
 
 ## Tech Stack & Core Libraries
 
-- **API Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Asynchronous Python 3.11+) with [Uvicorn](https://www.uvicorn.org/)
-- **LLM & Embeddings**: Google Gemini 2.0 Flash (`gemini-2.0-flash`) & `models/text-embedding-004`
-- **Vector Database**: [Neo4j](https://neo4j.com/) via `langchain-neo4j` vector store
-- **Orchestration**: [LangChain](https://www.langchain.com/) / `langchain-core` retrieval chains
-- **Document Processing**: `PyMuPDF` (fitz), `BeautifulSoup4`, and `Selenium`
-- **Memory & Caching**: Redis session store with JSON caching
-- **Data Validation**: Pydantic v2 with `ConfigDict`
-- **Testing**: Pytest with `pytest-asyncio` and `TestClient`
+- **Runtime**: Python 3.11+
+- **Task Queue**: BullMQ consumer backed by Redis
+- **LLM & Embeddings**: Google Gemini (`models/text-embedding-004`) & Local multilingual embedding fallback
+- **Vector Database**: [Neo4j](https://neo4j.com/) via `neo4j` Python driver & Cypher queries
+- **Document Processing**: `PyMuPDF` (fitz), `BeautifulSoup4`, `Selenium` with headless Chromium
+- **Testing**: `pytest` and `pytest-asyncio` (18 unit & pipeline tests)
 
 ---
 
 ## Key Features
 
-- **Multi-Modal Document Parsing**: Ingests and indexes multiple document formats (PDFs from URLs/local files, tabular CSVs, raw text, and structured JSON).
-- **Dynamic Web Scraping with Headless Chrome**: Automatically extracts rich DOM elements (headings, paragraphs, lists, and formatted Markdown hyperlinks) from dynamic JavaScript single-page apps.
-- **Secure File Caching**: Replaced insecure pickle serialization with structured, auditable JSON cache storage keyed by MD5 URL/file hashes.
-- **Persistent Conversational Memory**: Stores serialized chat session turns (`HumanMessage`, `AIMessage`) in Redis with automatic TTL and graceful in-memory fallback.
-- **Threadpool Offloading**: CPU-bound document chunking and vector index operations are offloaded using `starlette.concurrency.run_in_threadpool` to prevent blocking the FastAPI async event loop.
+- **Asynchronous Background Ingestion**: Non-blocking extraction of multi-page documents and dynamic web assets.
+- **Dynamic Web Scraping with Headless Chrome**: Automatically renders client-side JavaScript, extracts meaningful text, cleans boilerplate, and formats links.
+- **Resilient Fallback Embeddings**: Seamlessly falls back to local 768-dimensional multilingual embeddings if Google API quotas are exceeded or network connectivity drops.
+- **Structured JSON Caching**: Avoids redundant parsing of previously ingested files using deterministic MD5 content hashes.
+- **Graceful Error Handling & Bot Status Updates**: Updates job progress in Redis so users receive real-time feedback in the UI.
 
 ---
 
-## API Endpoints
+## Development & Testing
 
-### Health Check
-- `GET /health` - Service heartbeat, Redis connection status, and uptime verification.
+This service is part of the KSTM Turborepo monorepo.
 
-### Knowledge Base Ingestion
-- `POST /create-bot` - Concurrently downloads, parses, chunks, and indexes all knowledge sources for a bot into Neo4j vector store.
-
-### Conversational Retrieval (RAG)
-- `POST /query` - Executes semantic similarity search against Neo4j vector index, retrieves relevant context, loads past conversation memory from Redis, and synthesizes answers via Gemini.
-
----
-
-## Getting Started
-
-### Prerequisites
-- Python >= 3.11
-- Neo4j Instance (with Vector Index support)
-- Redis server
-- Google Gemini API Key
-
-### Installation
+### Local Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/yeabalex/KSTM-AI-SERVICE_FASTAPI.git
-cd KSTM-AI-SERVICE_FASTAPI
+cd apps/ai-service
 
 # Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
-```
 
-### Environment Configuration
+# Run the BullMQ worker
+python src/worker.py
 
-Copy `.env.example` to `.env` and fill in your credentials:
-
-```bash
-cp .env.example .env
-```
-
-### Running the Application
-
-```bash
-# Start FastAPI service with hot-reload
-uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Running the Test Suite
-
-```bash
-# Execute Pytest integration & validation test suite
+# Run unit tests
 pytest tests/ -v
 ```
 
----
-
-## Docker Deployment
-
-Build and run with Docker:
+### Monorepo Commands (from root)
 
 ```bash
-# Build Docker image
-docker build -t kstm-fastapi-service .
+# Run tests via Turbo
+pnpm --filter @kstm/ai-service test
 
-# Run container
-docker run -p 8000:8000 --env-file .env kstm-fastapi-service
+# Run worker via Turbo
+pnpm --filter @kstm/ai-service dev
 ```
-
----
-
-## License
-
-MIT License. Designed and built by [Yeab Alex](https://github.com/yeabalex).

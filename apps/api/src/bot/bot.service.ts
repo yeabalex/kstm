@@ -214,7 +214,10 @@ export class BotService {
         }
       }
 
-      if (!errorReason && (currentStatus === BotStatus.FAILED || jobState === 'failed')) {
+      if (
+        !errorReason &&
+        (currentStatus === BotStatus.FAILED || jobState === 'failed')
+      ) {
         errorReason = await redis.get(`bot:error:${botId}`).catch(() => null);
       }
     } catch (err) {
