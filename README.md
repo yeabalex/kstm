@@ -112,6 +112,17 @@ kstm/
 
 ---
 
+## 1-Click Free Cloud Deployment
+
+Deploy the entire stack for **$0 (no credit card required)** using automated Infrastructure as Code:
+
+| Service | Component | One-Click Action |
+| :--- | :--- | :--- |
+| **API Gateway & DB** | NestJS + Managed PostgreSQL | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/yeabalex/kstm) |
+| **Frontend** | Next.js 15 App | [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yeabalex/kstm&root-directory=apps/web&env=NEXT_PUBLIC_API_URL) |
+
+---
+
 ## Getting Started
 
 ### Prerequisites
